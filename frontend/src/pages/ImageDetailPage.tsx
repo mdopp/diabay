@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, ChevronLeft, ChevronRight, Download, RotateCw, Trash2, Sliders, Undo2, Maximize2, Menu } from 'lucide-react'
+import { API_URL, getAssetUrl } from '@/lib/api/client'
 import { ImageComparison } from '@/components/features/viewer/ImageComparison'
 import { ImageMetadataPanel } from '@/components/features/viewer/ImageMetadataPanel'
 import { PresetComparison } from '@/components/features/viewer/PresetComparison'
@@ -70,7 +71,7 @@ export function ImageDetailPage() {
   // Actions
   const handleDownload = () => {
     if (!image) return
-    const url = `http://localhost:8000/${image.enhanced_path}`
+    const url = `${API_URL}/${image.enhanced_path}`
     const link = document.createElement('a')
     link.href = url
     link.download = image.filename
@@ -84,7 +85,7 @@ export function ImageDetailPage() {
 
     try {
       // Call rotation API (90 degrees clockwise)
-      await fetch(`http://localhost:8000/api/images/${imageId}/rotate`, {
+      await fetch(`${API_URL}/api/images/${imageId}/rotate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ degrees: 90 })
@@ -127,7 +128,7 @@ export function ImageDetailPage() {
   const handlePresetSelected = async (preset: string, params: any) => {
     try {
       // Call reprocess API
-      const response = await fetch(`http://localhost:8000/api/images/${imageId}/reprocess`, {
+      const response = await fetch(`${API_URL}/api/images/${imageId}/reprocess`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ preset, ...params })
@@ -154,7 +155,7 @@ export function ImageDetailPage() {
     if (!image) return
 
     try {
-      const response = await fetch(`http://localhost:8000/api/images/${imageId}/use-original`, {
+      const response = await fetch(`${API_URL}/api/images/${imageId}/use-original`, {
         method: 'POST'
       })
 
@@ -208,14 +209,14 @@ export function ImageDetailPage() {
     )
   }
 
-  const enhancedUrl = `http://localhost:8000/${image.enhanced_path}`
+  const enhancedUrl = `${API_URL}/${image.enhanced_path}`
 
   // Use preview URL for TIFF originals (much faster than 100MB TIFF)
   // Falls back to original_path, then enhanced if neither available
   const originalUrl = image.original_preview_url
-    ? `http://localhost:8000${image.original_preview_url}`
+    ? `${API_URL}${image.original_preview_url}`
     : image.original_path
-      ? `http://localhost:8000/${image.original_path}`
+      ? `${API_URL}/${image.original_path}`
       : enhancedUrl
 
   return (
