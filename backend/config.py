@@ -7,7 +7,9 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
 
     # Directories
-    input_dir: Path = Path("./input")
+    # Note: Use INPUT_DIRS (plural) for comma-separated list of directories
+    # INPUT_DIR (singular) should be a single path
+    input_dir: str = "./input"
     # Comma-separated list of additional input directories to watch
     # Example: INPUT_DIRS="D:/Scans/New,D:/Scans/Archive"
     input_dirs: str = ""
@@ -52,7 +54,18 @@ class Settings(BaseSettings):
         Returns:
             List of Path objects for all input directories
         """
-        dirs = [self.input_dir]
+        dirs = []
+
+        # Handle backward compatibility: if input_dir contains comma, parse as list
+        if ',' in self.input_dir:
+            print("⚠️  WARNING: INPUT_DIR contains comma-separated paths. "
+                  "Please use INPUT_DIR for single path and INPUT_DIRS for additional paths.")
+            for dir_str in self.input_dir.split(','):
+                dir_str = dir_str.strip()
+                if dir_str:
+                    dirs.append(Path(dir_str))
+        else:
+            dirs.append(Path(self.input_dir))
 
         # Parse comma-separated additional directories
         if self.input_dirs:
@@ -73,7 +86,10 @@ class Settings(BaseSettings):
         # Get all input directories
         all_input_dirs = self.get_input_directories()
 
-        for dir_path in all_input_dirs + [self.analysed_dir, self.output_dir, self.models_dir]:
+        # Parse other directories (they might also have commas, though not recommended)
+        other_dirs = [Path(self.analysed_dir), Path(self.output_dir), Path(self.models_dir)]
+
+        for dir_path in all_input_dirs + other_dirs:
             try:
                 dir_path.mkdir(parents=True, exist_ok=True)
             except (PermissionError, OSError) as e:
