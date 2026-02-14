@@ -227,13 +227,38 @@ if ($hasNode) {
 
 Write-Header "Directory Configuration"
 
-# Get user directories
+# Check for existing .env file to use as defaults
+$envPath = Join-Path $BACKEND_DIR ".env"
+$existingInput = $null
+$existingOutput = $null
+
+if (Test-Path $envPath) {
+    Write-Info "Found existing .env file - using values as defaults"
+
+    # Parse .env file
+    $envContent = Get-Content $envPath
+    foreach ($line in $envContent) {
+        if ($line -match '^INPUT_DIR\s*=\s*(.+)$') {
+            $existingInput = $matches[1].Trim('"').Trim("'")
+        }
+        elseif ($line -match '^OUTPUT_DIR\s*=\s*(.+)$') {
+            $existingOutput = $matches[1].Trim('"').Trim("'")
+        }
+    }
+}
+
+# Get user directories as fallback
 $userDocuments = [Environment]::GetFolderPath("MyDocuments")
 $userPictures = [Environment]::GetFolderPath("MyPictures")
 
 # Prompt for input directory
 Write-Host "Input directory (where scanner saves TIFF files):" -ForegroundColor Yellow
-$defaultInput = $userDocuments
+if ($existingInput) {
+    $defaultInput = $existingInput
+    Write-Host "  Current: $existingInput" -ForegroundColor Gray
+} else {
+    $defaultInput = $userDocuments
+}
 $inputDir = Read-Host "  Path [$defaultInput]"
 if ([string]::IsNullOrWhiteSpace($inputDir)) {
     $inputDir = $defaultInput
@@ -243,7 +268,12 @@ Write-Success "Input: $inputDir"
 
 # Prompt for output directory
 Write-Host "`nOutput directory (where enhanced images will be saved):" -ForegroundColor Yellow
-$defaultOutput = Join-Path $userPictures "dias"
+if ($existingOutput) {
+    $defaultOutput = $existingOutput
+    Write-Host "  Current: $existingOutput" -ForegroundColor Gray
+} else {
+    $defaultOutput = Join-Path $userPictures "dias"
+}
 $outputDir = Read-Host "  Path [$defaultOutput]"
 if ([string]::IsNullOrWhiteSpace($outputDir)) {
     $outputDir = $defaultOutput
