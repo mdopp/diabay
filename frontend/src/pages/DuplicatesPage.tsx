@@ -43,7 +43,7 @@ export function DuplicatesPage() {
 
     const pollProgress = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/duplicates/progress')
+        const response = await fetch(`${API_URL}/api/duplicates/progress`)
         const progress: ScanProgress = await response.json()
         setScanProgress(progress)
       } catch (error) {
@@ -255,8 +255,8 @@ export function DuplicatesPage() {
                               <img
                                 src={
                                   originalImage.thumbnail_url
-                                    ? `${API_URL}${originalImage.thumbnail_url}`
-                                    : `${API_URL}/${originalImage.enhanced_path}`
+                                    ? getAssetUrl(originalImage.thumbnail_url)
+                                    : getAssetUrl(originalImage.enhanced_path)
                                 }
                                 alt={originalImage.filename}
                                 className="w-full h-full object-cover"
@@ -277,8 +277,8 @@ export function DuplicatesPage() {
                                 <img
                                   src={
                                     image.thumbnail_url
-                                      ? `${API_URL}${image.thumbnail_url}`
-                                      : `${API_URL}/${image.enhanced_path}`
+                                      ? getAssetUrl(image.thumbnail_url)
+                                      : getAssetUrl(image.enhanced_path)
                                   }
                                   alt={image.filename}
                                   className="w-full h-full object-cover"

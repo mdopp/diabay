@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card'
 import { Check, Loader2, RefreshCw, ImageIcon, AlertCircle, Maximize2 } from 'lucide-react'
 import type { ImageDetail } from '@/types/image'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { API_URL, getAssetUrl } from '@/lib/api/client'
+import { API_URL } from '@/lib/api/client'
 
 interface PresetComparisonProps {
   open: boolean
