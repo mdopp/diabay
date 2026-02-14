@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card'
 import { Check, Loader2, RefreshCw, ImageIcon, AlertCircle, Maximize2 } from 'lucide-react'
 import type { ImageDetail } from '@/types/image'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { API_URL, getAssetUrl } from '@/lib/api/client'
 
 interface PresetComparisonProps {
   open: boolean
@@ -69,7 +70,7 @@ export function PresetComparison({ open, onOpenChange, image, onPresetSelected }
     setPreviewError(null)
 
     try {
-      const response = await fetch(`http://localhost:8000/api/images/${image.id}/preview`, {
+      const response = await fetch(`${API_URL}/api/images/${image.id}/preview`, {
         method: 'POST'
       })
 
@@ -208,7 +209,7 @@ export function PresetComparison({ open, onOpenChange, image, onPresetSelected }
                       ) : previews && previews[preset.name] ? (
                         <>
                           <img
-                            src={`http://localhost:8000/${previews[preset.name]}`}
+                            src={`${API_URL}/${previews[preset.name]}`}
                             alt={`${preset.label} preview`}
                             className="w-full h-full object-contain"
                           />
@@ -218,7 +219,7 @@ export function PresetComparison({ open, onOpenChange, image, onPresetSelected }
                             className="absolute top-2 right-2 h-8 w-8 bg-black/70 hover:bg-black/90 opacity-0 group-hover:opacity-100 transition-opacity"
                             onClick={() => setFullscreenPreview({
                               name: preset.name,
-                              url: `http://localhost:8000/${previews[preset.name]}`,
+                              url: `${API_URL}/${previews[preset.name]}`,
                               label: preset.label
                             })}
                             title="View fullscreen"
@@ -229,7 +230,7 @@ export function PresetComparison({ open, onOpenChange, image, onPresetSelected }
                       ) : isCurrent ? (
                         <>
                           <img
-                            src={`http://localhost:8000/${image.enhanced_path}`}
+                            src={`${API_URL}/${image.enhanced_path}`}
                             alt="Current version"
                             className="w-full h-full object-contain"
                           />
@@ -239,7 +240,7 @@ export function PresetComparison({ open, onOpenChange, image, onPresetSelected }
                             className="absolute top-2 right-2 h-8 w-8 bg-black/70 hover:bg-black/90 opacity-0 group-hover:opacity-100 transition-opacity"
                             onClick={() => setFullscreenPreview({
                               name: preset.name,
-                              url: `http://localhost:8000/${image.enhanced_path}`,
+                              url: `${API_URL}/${image.enhanced_path}`,
                               label: `${preset.label} (Current)`
                             })}
                             title="View fullscreen"
