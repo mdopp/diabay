@@ -84,29 +84,36 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files for serving images
-app.mount("/output", StaticFiles(directory=str(settings.output_dir)), name="output")
+# Mount static files for serving images (skip in CI/test environments)
+import os
+if not (os.getenv("CI") or os.getenv("PYTEST_CURRENT_TEST")):
+    # Ensure directories exist before mounting
+    settings.output_dir.mkdir(parents=True, exist_ok=True)
+    settings.analysed_dir.mkdir(parents=True, exist_ok=True)
+    settings.input_dir.mkdir(parents=True, exist_ok=True)
 
-# Create and mount thumbnails directory
-thumbnail_dir = settings.output_dir.parent / "thumbnails"
-thumbnail_dir.mkdir(exist_ok=True)
-app.mount("/thumbnails", StaticFiles(directory=str(thumbnail_dir)), name="thumbnails")
+    app.mount("/output", StaticFiles(directory=str(settings.output_dir)), name="output")
 
-# Mount analysed directory for original TIFF files
-app.mount("/analysed", StaticFiles(directory=str(settings.analysed_dir)), name="analysed")
+    # Create and mount thumbnails directory
+    thumbnail_dir = settings.output_dir.parent / "thumbnails"
+    thumbnail_dir.mkdir(exist_ok=True)
+    app.mount("/thumbnails", StaticFiles(directory=str(thumbnail_dir)), name="thumbnails")
 
-# Mount input directory for raw TIFF files
-app.mount("/input", StaticFiles(directory=str(settings.input_dir)), name="input")
+    # Mount analysed directory for original TIFF files
+    app.mount("/analysed", StaticFiles(directory=str(settings.analysed_dir)), name="analysed")
 
-# Mount previews directory for downscaled original previews
-preview_dir = settings.output_dir.parent / "previews"
-preview_dir.mkdir(exist_ok=True)
-app.mount("/previews", StaticFiles(directory=str(preview_dir)), name="previews")
+    # Mount input directory for raw TIFF files
+    app.mount("/input", StaticFiles(directory=str(settings.input_dir)), name="input")
 
-# Mount temp_previews directory for preset comparison previews
-temp_preview_dir = settings.output_dir.parent / "temp_previews"
-temp_preview_dir.mkdir(exist_ok=True)
-app.mount("/temp_previews", StaticFiles(directory=str(temp_preview_dir)), name="temp_previews")
+    # Mount previews directory for downscaled original previews
+    preview_dir = settings.output_dir.parent / "previews"
+    preview_dir.mkdir(exist_ok=True)
+    app.mount("/previews", StaticFiles(directory=str(preview_dir)), name="previews")
+
+    # Mount temp_previews directory for preset comparison previews
+    temp_preview_dir = settings.output_dir.parent / "temp_previews"
+    temp_preview_dir.mkdir(exist_ok=True)
+    app.mount("/temp_previews", StaticFiles(directory=str(temp_preview_dir)), name="temp_previews")
 
 
 # ============================================================================
