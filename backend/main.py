@@ -87,10 +87,7 @@ app.add_middleware(
 # Mount static files for serving images (skip in CI/test environments)
 import os
 if not (os.getenv("CI") or os.getenv("PYTEST_CURRENT_TEST")):
-    # Ensure directories exist before mounting
-    settings.output_dir.mkdir(parents=True, exist_ok=True)
-    settings.analysed_dir.mkdir(parents=True, exist_ok=True)
-    settings.input_dir.mkdir(parents=True, exist_ok=True)
+    # Note: Main directories are created by settings.ensure_directories() in config.py
 
     app.mount("/output", StaticFiles(directory=str(settings.output_dir)), name="output")
 
