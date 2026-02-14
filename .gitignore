@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+.venv/
+venv/
+*.db
+*.db-journal
+
+# Node
+node_modules/
+npm-debug.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+backend/input/
+backend/analysed/
+backend/output/
+backend/thumbnails/
+backend/previews/
+backend/temp_previews/
+backend/tests/samples/*.tif
+backend/tests/samples/*.jpg
+!backend/tests/samples/.gitkeep
+
+# Keep dist folder (pre-built frontend for Windows)
+# !frontend/dist/
