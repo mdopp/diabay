@@ -1,13 +1,31 @@
 import { useStatsStore } from '@/store/useStatsStore'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { TimelineChart } from '@/components/features/stats/TimelineChart'
-import { AlertCircle, TrendingDown, TrendingUp, Minus, ArrowRight, CheckCircle, Clock, Zap, AlertTriangle } from 'lucide-react'
+import { AlertCircle, TrendingDown, TrendingUp, Minus, ArrowRight, CheckCircle, Clock, Zap, AlertTriangle, RefreshCw, Database } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { rescanOutputDirectory } from '@/lib/api/rescan'
+import { useState } from 'react'
 
 export function StatsPage() {
   const stats = useStatsStore((state) => state.stats)
   const connectionStatus = useStatsStore((state) => state.connectionStatus)
+  const [isRescanning, setIsRescanning] = useState(false)
+  const [rescanResult, setRescanResult] = useState<any>(null)
+
+  const handleRescan = async () => {
+    setIsRescanning(true)
+    setRescanResult(null)
+    try {
+      const result = await rescanOutputDirectory(true)
+      setRescanResult(result)
+    } catch (error) {
+      setRescanResult({ error: 'Failed to rescan directory' })
+    } finally {
+      setIsRescanning(false)
+    }
+  }
 
   // Format ETA
   const formatETA = (minutes: number) => {
@@ -147,6 +165,65 @@ export function StatsPage() {
                     <span className="font-medium">{stats.pipeline.completed_session} processed</span>
                   </div>
                 </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Database Sync */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Database className="w-5 h-5" />
+                Database Management
+              </CardTitle>
+              <CardDescription>Sync output directory with database</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Scan output directory for images not in the database, generate missing thumbnails, and write tags to image metadata.
+              </p>
+              <Button
+                onClick={handleRescan}
+                disabled={isRescanning}
+                className="w-full"
+              >
+                {isRescanning ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Scanning...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Rescan & Sync Database
+                  </>
+                )}
+              </Button>
+
+              {rescanResult && (
+                <Alert variant={rescanResult.error ? 'destructive' : 'default'} className="mt-3">
+                  {rescanResult.error ? (
+                    <>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Error</AlertTitle>
+                      <AlertDescription>{rescanResult.error}</AlertDescription>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-4 w-4" />
+                      <AlertTitle>Rescan Complete</AlertTitle>
+                      <AlertDescription className="mt-2 space-y-1">
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>Total scanned: <strong>{rescanResult.total_scanned}</strong></div>
+                          <div>Already in DB: <strong>{rescanResult.already_in_db}</strong></div>
+                          <div>Images added: <strong>{rescanResult.images_added}</strong></div>
+                          <div>Thumbnails: <strong>{rescanResult.thumbnails_generated}</strong></div>
+                          <div className="col-span-2">Tags written to files: <strong>{rescanResult.tags_written}</strong></div>
+                        </div>
+                      </AlertDescription>
+                    </>
+                  )}
+                </Alert>
               )}
             </CardContent>
           </Card>
