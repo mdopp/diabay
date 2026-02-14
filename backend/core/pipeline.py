@@ -492,7 +492,9 @@ class ProcessingPipeline:
         analysed_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Move and rename file
-        await asyncio.to_thread(file_path.rename, analysed_path)
+        # Use shutil.move for cross-drive compatibility (rename doesn't work across drives)
+        import shutil
+        await asyncio.to_thread(shutil.move, str(file_path), str(analysed_path))
         logger.info(f"Renamed: {file_path.name} → {analysed_path.name}")
 
         return analysed_path
