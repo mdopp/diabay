@@ -1580,6 +1580,23 @@ async def rescan_output_directory(
                 added_count += 1
                 logger.info(f"Added to database: {image_path.name}")
 
+                # Read tags from image metadata and create ImageTag records
+                try:
+                    tags_from_file = await read_tags_from_image_metadata(image_path)
+                    if tags_from_file:
+                        for tag_name in tags_from_file:
+                            # Create ImageTag record (AI-generated flag = False since these are from file)
+                            image_tag = ImageTag(
+                                image_id=new_image.id,
+                                tag=tag_name,
+                                ai_generated=False
+                            )
+                            db.add(image_tag)
+                        logger.info(f"Imported {len(tags_from_file)} tags from {image_path.name}")
+                        tags_written_count += 1
+                except Exception as tag_err:
+                    logger.warning(f"Failed to read tags from {image_path.name}: {tag_err}")
+
                 # Generate thumbnail if missing
                 thumbnail_path = thumbnail_dir / image_path.name
                 if not thumbnail_path.exists():
@@ -1649,6 +1666,58 @@ async def rescan_output_directory(
     except Exception as e:
         logger.error(f"Error during rescan: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+async def read_tags_from_image_metadata(image_path: Path) -> list[str]:
+    """
+    Read tags from image EXIF/IPTC metadata
+
+    Args:
+        image_path: Path to image file
+
+    Returns:
+        List of tag strings found in metadata
+    """
+    try:
+        from PIL import Image as PILImage
+        import piexif
+
+        # Load image
+        img = PILImage.open(image_path)
+
+        # Get EXIF data
+        if "exif" not in img.info:
+            return []
+
+        exif_dict = piexif.load(str(image_path))
+
+        tags = []
+
+        # Try to read from XPKeywords (Windows)
+        if piexif.ImageIFD.XPKeywords in exif_dict.get("0th", {}):
+            try:
+                keywords = exif_dict["0th"][piexif.ImageIFD.XPKeywords].decode('utf-16le')
+                tags = [tag.strip() for tag in keywords.split(',') if tag.strip()]
+            except Exception as e:
+                logger.debug(f"Error decoding XPKeywords: {e}")
+
+        # If no tags yet, try ImageDescription
+        if not tags and piexif.ImageIFD.ImageDescription in exif_dict.get("0th", {}):
+            try:
+                description = exif_dict["0th"][piexif.ImageIFD.ImageDescription].decode('utf-8')
+                tags = [tag.strip() for tag in description.split(',') if tag.strip()]
+            except Exception as e:
+                logger.debug(f"Error decoding ImageDescription: {e}")
+
+        logger.debug(f"Read {len(tags)} tags from {image_path.name}")
+        return tags
+
+    except ImportError:
+        logger.warning("piexif not installed - cannot read tags from metadata")
+        return []
+    except Exception as e:
+        logger.warning(f"Error reading tags from {image_path.name}: {e}")
+        return []
 
 
 async def write_tags_to_image_metadata(image_path: Path, tags: list[str]) -> bool:
