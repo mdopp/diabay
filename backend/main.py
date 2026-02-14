@@ -1487,6 +1487,190 @@ async def get_duplicate_scan_progress():
 
 
 # ============================================================================
+# RESCAN & SYNC
+# ============================================================================
+
+@app.post("/api/rescan")
+async def rescan_output_directory(
+    write_tags_to_files: bool = True,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Rescan output directory and sync with database
+    - Find images in output directory not in database
+    - Create database records for missing images
+    - Generate missing thumbnails
+    - Optionally write tags to image EXIF/IPTC metadata
+    """
+    from sqlalchemy import select
+    from db.models import Image, ImageTag
+    import cv2
+    from datetime import datetime
+
+    try:
+        output_dir = settings.output_dir
+        thumbnail_dir = output_dir.parent / "thumbnails"
+        thumbnail_dir.mkdir(exist_ok=True)
+
+        # Get all image files in output directory
+        image_extensions = {'.jpg', '.jpeg', '.png', '.tif', '.tiff'}
+        image_files = [f for f in output_dir.iterdir()
+                      if f.is_file() and f.suffix.lower() in image_extensions]
+
+        logger.info(f"Found {len(image_files)} images in output directory")
+
+        # Get all filenames currently in database
+        query = select(Image.filename)
+        result = await db.execute(query)
+        db_filenames = set(row[0] for row in result.fetchall())
+
+        # Find images not in database
+        missing_images = [f for f in image_files if f.name not in db_filenames]
+        logger.info(f"Found {len(missing_images)} images not in database")
+
+        added_count = 0
+        thumbnail_count = 0
+        tags_written_count = 0
+
+        for image_path in missing_images:
+            try:
+                # Read image to get dimensions
+                img = cv2.imread(str(image_path))
+                if img is None:
+                    logger.warning(f"Could not read image: {image_path.name}")
+                    continue
+
+                height, width = img.shape[:2]
+
+                # Create database record
+                new_image = Image(
+                    filename=image_path.name,
+                    original_path=None,  # Unknown for rescanned images
+                    enhanced_path=str(image_path),
+                    width=width,
+                    height=height,
+                    status="completed",
+                    created_at=datetime.fromtimestamp(image_path.stat().st_ctime),
+                    processed_at=datetime.now()
+                )
+                db.add(new_image)
+                await db.flush()  # Get the ID
+
+                added_count += 1
+                logger.info(f"Added to database: {image_path.name}")
+
+                # Generate thumbnail if missing
+                thumbnail_path = thumbnail_dir / image_path.name
+                if not thumbnail_path.exists():
+                    try:
+                        max_size = 400
+                        h, w = img.shape[:2]
+                        if h > max_size or w > max_size:
+                            if h > w:
+                                new_height = max_size
+                                new_width = int(w * (max_size / h))
+                            else:
+                                new_width = max_size
+                                new_height = int(h * (max_size / w))
+                            thumbnail = cv2.resize(img, (new_width, new_height), interpolation=cv2.INTER_AREA)
+                        else:
+                            thumbnail = img
+
+                        cv2.imwrite(str(thumbnail_path), thumbnail, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                        thumbnail_count += 1
+                        logger.info(f"Generated thumbnail: {image_path.name}")
+                    except Exception as thumb_err:
+                        logger.error(f"Failed to generate thumbnail for {image_path.name}: {thumb_err}")
+
+            except Exception as img_err:
+                logger.error(f"Error processing {image_path.name}: {img_err}")
+                continue
+
+        # Commit all new records
+        await db.commit()
+
+        # Write tags to file metadata if requested
+        if write_tags_to_files:
+            # Get all images with tags
+            query = select(Image).join(ImageTag, isouter=True)
+            result = await db.execute(query)
+            images_with_tags = result.scalars().unique().all()
+
+            for image in images_with_tags:
+                if image.tags:
+                    try:
+                        image_path = output_dir / image.filename
+                        if image_path.exists():
+                            tags = [tag.tag for tag in image.tags]
+                            if await write_tags_to_image_metadata(image_path, tags):
+                                tags_written_count += 1
+                    except Exception as tag_err:
+                        logger.error(f"Failed to write tags for {image.filename}: {tag_err}")
+
+        logger.info(f"Rescan complete: {added_count} added, {thumbnail_count} thumbnails generated, {tags_written_count} files tagged")
+
+        return {
+            "success": True,
+            "images_added": added_count,
+            "thumbnails_generated": thumbnail_count,
+            "tags_written": tags_written_count,
+            "total_scanned": len(image_files),
+            "already_in_db": len(db_filenames)
+        }
+
+    except Exception as e:
+        logger.error(f"Error during rescan: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def write_tags_to_image_metadata(image_path: Path, tags: list[str]) -> bool:
+    """
+    Write tags to image EXIF/IPTC metadata
+
+    Args:
+        image_path: Path to image file
+        tags: List of tag strings
+
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        from PIL import Image as PILImage
+        from PIL import ExifTags
+        import piexif
+
+        # Convert tags to comma-separated string
+        keywords = ", ".join(tags)
+
+        # Load image
+        img = PILImage.open(image_path)
+
+        # Get existing EXIF data or create new
+        exif_dict = piexif.load(str(image_path)) if "exif" in img.info else {"0th": {}, "Exif": {}, "GPS": {}, "1st": {}}
+
+        # Write keywords to IPTC Keywords field (piexif doesn't support IPTC directly)
+        # Use XPKeywords (Windows) and ImageDescription for compatibility
+        exif_dict["0th"][piexif.ImageIFD.XPKeywords] = keywords.encode('utf-16le')
+        exif_dict["0th"][piexif.ImageIFD.ImageDescription] = keywords.encode('utf-8')
+
+        # Convert back to bytes
+        exif_bytes = piexif.dump(exif_dict)
+
+        # Save image with new EXIF data
+        img.save(str(image_path), exif=exif_bytes, quality=95)
+
+        logger.debug(f"Wrote {len(tags)} tags to {image_path.name}")
+        return True
+
+    except ImportError:
+        logger.warning("piexif not installed - cannot write tags to metadata. Install with: pip install piexif")
+        return False
+    except Exception as e:
+        logger.error(f"Failed to write tags to {image_path.name}: {e}")
+        return False
+
+
+# ============================================================================
 # Production Frontend Serving (Optional - for single-server deployment)
 # ============================================================================
 
