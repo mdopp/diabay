@@ -402,6 +402,53 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
     return stats
 
 
+def load_image_with_orientation(image_path: Path) -> np.ndarray:
+    """
+    Load image respecting EXIF orientation, returns BGR numpy array for OpenCV
+
+    Args:
+        image_path: Path to image file
+
+    Returns:
+        numpy array in BGR format (OpenCV compatible)
+    """
+    from PIL import Image as PILImage, ImageOps
+    import cv2
+
+    try:
+        with PILImage.open(image_path) as pil_img:
+            # Apply EXIF orientation if present
+            pil_img = ImageOps.exif_transpose(pil_img)
+
+            # Convert to RGB if needed
+            if pil_img.mode not in ('RGB', 'L', 'I;16'):
+                pil_img = pil_img.convert('RGB')
+
+            # Convert to numpy array
+            img = np.array(pil_img)
+
+            # Convert RGB to BGR for OpenCV
+            if len(img.shape) == 3 and img.shape[2] == 3:
+                img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+            elif len(img.shape) == 2:
+                # Grayscale - convert to BGR
+                img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+
+            return img
+    except Exception as e:
+        # Fallback to cv2 if PIL fails
+        logger.warning(f"PIL failed to load {image_path}, falling back to cv2: {e}")
+        img = cv2.imread(str(image_path), cv2.IMREAD_UNCHANGED)
+        if img is None:
+            raise ValueError(f"Could not load image: {image_path}")
+
+        # Ensure BGR format
+        if len(img.shape) == 2:
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+
+        return img
+
+
 def generate_thumbnail(image_filename: str, output_dir: Path) -> bool:
     """Generate thumbnail for an image if it doesn't exist"""
     import cv2
@@ -420,7 +467,8 @@ def generate_thumbnail(image_filename: str, output_dir: Path) -> bool:
         return False
 
     try:
-        img = cv2.imread(str(original_path))
+        # Load with EXIF orientation support
+        img = load_image_with_orientation(original_path)
         if img is None:
             return False
 
@@ -470,8 +518,15 @@ def generate_original_preview(original_tiff_path: Path) -> tuple[bool, str]:
         return True, f"/previews/{preview_filename}"
 
     try:
-        # Load TIFF (cv2 supports 16-bit TIFFs)
-        img = cv2.imread(str(original_tiff_path), cv2.IMREAD_UNCHANGED)
+        # Load TIFF with EXIF orientation support
+        # Note: For 16-bit TIFFs, we may need special handling
+        try:
+            img = load_image_with_orientation(original_tiff_path)
+        except Exception as pil_error:
+            # Fallback for 16-bit TIFFs that PIL may not handle well
+            logger.info(f"PIL couldn't load {original_tiff_path}, using cv2: {pil_error}")
+            img = cv2.imread(str(original_tiff_path), cv2.IMREAD_UNCHANGED)
+
         if img is None:
             logger.error(f"Failed to load TIFF: {original_tiff_path}")
             return False, ""

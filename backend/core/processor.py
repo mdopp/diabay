@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Tuple, Optional, Dict
 from dataclasses import dataclass
 from enum import Enum
+from PIL import Image as PILImage, ImageOps
 
 
 class EnhancementPreset(Enum):
@@ -105,11 +106,28 @@ class ImageProcessor:
         )
 
     def _load_image(self, image_path: Path) -> np.ndarray:
-        """Load image and convert to 8-bit BGR if necessary"""
-        img = cv2.imread(str(image_path), cv2.IMREAD_UNCHANGED)
+        """Load image and convert to 8-bit BGR if necessary, respecting EXIF orientation"""
+        # Use PIL to load image and apply EXIF orientation
+        try:
+            with PILImage.open(image_path) as pil_img:
+                # Apply EXIF orientation if present
+                pil_img = ImageOps.exif_transpose(pil_img)
 
-        if img is None:
-            raise ValueError(f"Could not load image: {image_path}")
+                # Convert to RGB if needed
+                if pil_img.mode not in ('RGB', 'L', 'I;16'):
+                    pil_img = pil_img.convert('RGB')
+
+                # Convert to numpy array
+                img = np.array(pil_img)
+
+                # Convert RGB to BGR for OpenCV
+                if len(img.shape) == 3 and img.shape[2] == 3:
+                    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        except Exception as e:
+            # Fallback to cv2 if PIL fails
+            img = cv2.imread(str(image_path), cv2.IMREAD_UNCHANGED)
+            if img is None:
+                raise ValueError(f"Could not load image: {image_path}: {e}")
 
         # Convert 16-bit to 8-bit using improved percentile stretching
         if img.dtype == np.uint16:
