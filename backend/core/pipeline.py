@@ -658,8 +658,10 @@ class ProcessingPipeline:
 
         Returns detailed statistics for monitoring UI
         """
-        # Count files in each stage
-        input_count = sum(1 for _ in settings.input_dir.rglob("*.tif*"))
+        # Count files in each stage (across all input directories)
+        input_count = 0
+        for input_dir in settings.get_input_directories():
+            input_count += sum(1 for _ in input_dir.rglob("*.tif*"))
 
         # Count analysed files that HAVEN'T been enhanced yet
         analysed_count = 0
