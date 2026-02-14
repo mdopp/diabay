@@ -5,6 +5,7 @@ Handles all image processing: enhancement, format conversion, quality optimizati
 import cv2
 import numpy as np
 import logging
+import gc
 from pathlib import Path
 from typing import Tuple, Optional, Dict
 from dataclasses import dataclass
@@ -78,81 +79,115 @@ class ImageProcessor:
         Returns:
             ProcessingResult with enhanced image and metadata
         """
-        # Load image
-        img = self._load_image(image_path)
-        original_size = (img.shape[1], img.shape[0])
+        try:
+            # Load image
+            img = self._load_image(image_path)
+            original_size = (img.shape[1], img.shape[0])
 
-        # Use preset if specified
-        if preset:
-            self.histogram_clip = preset.hist_clip
-            self.clahe_clip = preset.clahe_clip
+            # Use preset if specified
+            if preset:
+                self.histogram_clip = preset.hist_clip
+                self.clahe_clip = preset.clahe_clip
 
-        # Auto-quality: try multiple presets and select best
-        if auto_quality:
-            return self._process_with_auto_quality(img, original_size)
+            # Auto-quality: try multiple presets and select best
+            if auto_quality:
+                result = self._process_with_auto_quality(img, original_size)
+                # Clean up source image
+                del img
+                gc.collect()
+                return result
 
-        # Standard enhancement pipeline
-        enhanced = self._enhance_image(img)
+            # Standard enhancement pipeline
+            enhanced = self._enhance_image(img)
 
-        # Calculate quality score
-        quality_score = self._calculate_quality_score(enhanced)
+            # Calculate quality score
+            quality_score = self._calculate_quality_score(enhanced)
 
-        return ProcessingResult(
-            enhanced=enhanced,
-            original_size=original_size,
-            enhancement_params={
-                'histogram_clip': self.histogram_clip,
-                'clahe_clip': self.clahe_clip
-            },
-            face_detected=False,  # Set by face detection if enabled
-            quality_score=quality_score
-        )
+            # Clean up source image before returning
+            del img
+            gc.collect()
+
+            return ProcessingResult(
+                enhanced=enhanced,
+                original_size=original_size,
+                enhancement_params={
+                    'histogram_clip': self.histogram_clip,
+                    'clahe_clip': self.clahe_clip
+                },
+                face_detected=False,  # Set by face detection if enabled
+                quality_score=quality_score
+            )
+        except MemoryError as e:
+            logger.error(f"Out of memory processing {image_path.name}: {e}")
+            gc.collect()  # Force garbage collection
+            raise
+        except Exception as e:
+            logger.error(f"Error processing {image_path.name}: {e}")
+            gc.collect()
+            raise
 
     def _load_image(self, image_path: Path) -> np.ndarray:
         """Load image and convert to 8-bit BGR if necessary, respecting EXIF orientation"""
         # Use PIL to load image and apply EXIF orientation
+        pil_img = None
         try:
-            with PILImage.open(image_path) as pil_img:
-                # Check if EXIF orientation exists and is meaningful
-                exif = pil_img.getexif()
-                orientation_tag = exif.get(274) if exif else None
+            pil_img = PILImage.open(image_path)
 
-                # Orientation tag 1 = Normal, but image might still be rotated
-                # Only trust orientation tags 2-8 (which indicate actual rotation/flip)
-                has_meaningful_orientation = orientation_tag is not None and orientation_tag != 1
+            # Check if EXIF orientation exists and is meaningful
+            exif = pil_img.getexif()
+            orientation_tag = exif.get(274) if exif else None
 
-                # If no meaningful EXIF orientation tag, try auto-detection
-                if not has_meaningful_orientation:
-                    try:
-                        from core.orientation_detector import OrientationDetector
-                        detected_angle = OrientationDetector.auto_detect_orientation(image_path)
-                        if detected_angle != 0:
-                            logger.info(f"Auto-detected orientation: {detected_angle}° for {image_path.name}")
-                            # Rotate the image based on detection
-                            if detected_angle == 90:
-                                pil_img = pil_img.rotate(-90, expand=True)
-                            elif detected_angle == 180:
-                                pil_img = pil_img.rotate(180, expand=True)
-                            elif detected_angle == 270:
-                                pil_img = pil_img.rotate(-270, expand=True)
-                    except Exception as e:
-                        logger.warning(f"Auto-orientation detection failed: {e}")
+            # Orientation tag 1 = Normal, but image might still be rotated
+            # Only trust orientation tags 2-8 (which indicate actual rotation/flip)
+            has_meaningful_orientation = orientation_tag is not None and orientation_tag != 1
 
-                # Apply EXIF orientation if present (for tags 2-8)
-                pil_img = ImageOps.exif_transpose(pil_img)
+            # If no meaningful EXIF orientation tag, try auto-detection
+            # Skip for very large images to avoid memory issues
+            height, width = pil_img.size[1], pil_img.size[0]
+            if not has_meaningful_orientation and height * width < 25_000_000:  # ~5000x5000
+                try:
+                    from core.orientation_detector import OrientationDetector
+                    detected_angle = OrientationDetector.auto_detect_orientation(image_path)
+                    if detected_angle != 0:
+                        logger.info(f"Auto-detected orientation: {detected_angle}° for {image_path.name}")
+                        # Rotate the image based on detection
+                        if detected_angle == 90:
+                            pil_img = pil_img.rotate(-90, expand=True)
+                        elif detected_angle == 180:
+                            pil_img = pil_img.rotate(180, expand=True)
+                        elif detected_angle == 270:
+                            pil_img = pil_img.rotate(-270, expand=True)
+                except Exception as e:
+                    logger.debug(f"Auto-orientation detection skipped: {e}")
 
-                # Convert to RGB if needed
-                if pil_img.mode not in ('RGB', 'L', 'I;16'):
-                    pil_img = pil_img.convert('RGB')
+            # Apply EXIF orientation if present (for tags 2-8)
+            pil_img = ImageOps.exif_transpose(pil_img)
 
-                # Convert to numpy array
-                img = np.array(pil_img)
+            # Convert to RGB if needed
+            if pil_img.mode not in ('RGB', 'L'):
+                pil_img = pil_img.convert('RGB')
 
-                # Convert RGB to BGR for OpenCV
-                if len(img.shape) == 3 and img.shape[2] == 3:
-                    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-        except Exception as e:
-            # Fallback to cv2 if PIL fails
+            # Convert to numpy array
+            img = np.array(pil_img, dtype=np.uint8)
+
+            # Explicitly close and delete PIL image to free memory
+            pil_img.close()
+            del pil_img
+
+            # Convert RGB to BGR for OpenCV
+            if len(img.shape) == 3 and img.shape[2] == 3:
+                img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+
+        except (MemoryError, Exception) as e:
+            # Close PIL image if it was opened
+            if pil_img is not None:
+                try:
+                    pil_img.close()
+                except:
+                    pass
+
+            # Fallback to cv2 if PIL fails or runs out of memory
+            logger.warning(f"PIL loading failed for {image_path.name}, using cv2: {e}")
             img = cv2.imread(str(image_path), cv2.IMREAD_UNCHANGED)
             if img is None:
                 raise ValueError(f"Could not load image: {image_path}: {e}")

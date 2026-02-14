@@ -428,26 +428,27 @@ class ProcessingPipeline:
         """
         try:
             from PIL import Image as PILImage
-            from PIL.ExifTags import TAGS
 
-            img = PILImage.open(file_path)
-            exif_data = img._getexif()
+            with PILImage.open(file_path) as img:
+                # Use getexif() instead of deprecated _getexif()
+                exif = img.getexif()
 
-            if exif_data:
-                # Try different date fields
-                for tag_id, value in exif_data.items():
-                    tag_name = TAGS.get(tag_id, tag_id)
-                    if tag_name in ['DateTime', 'DateTimeOriginal', 'DateTimeDigitized']:
-                        # Parse EXIF date format: "2024:02:10 14:32:15"
-                        try:
-                            return datetime.strptime(value, "%Y:%m:%d %H:%M:%S")
-                        except ValueError:
-                            continue
+                if exif:
+                    # Try different date fields (tag IDs)
+                    # 306 = DateTime, 36867 = DateTimeOriginal, 36868 = DateTimeDigitized
+                    for tag_id in [36867, 306, 36868]:
+                        value = exif.get(tag_id)
+                        if value:
+                            # Parse EXIF date format: "2024:02:10 14:32:15"
+                            try:
+                                return datetime.strptime(value, "%Y:%m:%d %H:%M:%S")
+                            except (ValueError, TypeError):
+                                continue
 
             return None
 
         except Exception as e:
-            logger.warning(f"Could not extract EXIF from {file_path.name}: {e}")
+            logger.debug(f"Could not extract EXIF from {file_path.name}: {e}")
             return None
 
     def _generate_unique_filename(self, base_date: datetime, extension: str = ".tif") -> Path:
