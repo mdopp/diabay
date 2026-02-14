@@ -92,21 +92,46 @@ fi
 
 print_header "Directory Configuration"
 
-# Get user directories
+# Check for existing .env file to use as defaults
+ENV_PATH="$BACKEND_DIR/.env"
+EXISTING_INPUT=""
+EXISTING_OUTPUT=""
+
+if [ -f "$ENV_PATH" ]; then
+    print_info "Found existing .env file - using values as defaults"
+
+    # Parse .env file
+    EXISTING_INPUT=$(grep '^INPUT_DIR=' "$ENV_PATH" | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+    EXISTING_OUTPUT=$(grep '^OUTPUT_DIR=' "$ENV_PATH" | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+fi
+
+# Get user directories as fallback
 USER_DOCUMENTS="${HOME}/Documents"
 USER_PICTURES="${HOME}/Pictures"
 
 # Prompt for input directory
 echo -e "${YELLOW}Input directory (where scanner saves TIFF files):${NC}"
-read -p "  Path [$USER_DOCUMENTS]: " INPUT_DIR
-INPUT_DIR="${INPUT_DIR:-$USER_DOCUMENTS}"
+if [ -n "$EXISTING_INPUT" ]; then
+    DEFAULT_INPUT="$EXISTING_INPUT"
+    echo -e "  ${NC}Current: $EXISTING_INPUT${NC}"
+else
+    DEFAULT_INPUT="$USER_DOCUMENTS"
+fi
+read -p "  Path [$DEFAULT_INPUT]: " INPUT_DIR
+INPUT_DIR="${INPUT_DIR:-$DEFAULT_INPUT}"
 INPUT_DIR=$(realpath -m "$INPUT_DIR")
 print_success "Input: $INPUT_DIR"
 
 # Prompt for output directory
 echo -e "\n${YELLOW}Output directory (where enhanced images will be saved):${NC}"
-read -p "  Path [$USER_PICTURES/dias]: " OUTPUT_DIR
-OUTPUT_DIR="${OUTPUT_DIR:-$USER_PICTURES/dias}"
+if [ -n "$EXISTING_OUTPUT" ]; then
+    DEFAULT_OUTPUT="$EXISTING_OUTPUT"
+    echo -e "  ${NC}Current: $EXISTING_OUTPUT${NC}"
+else
+    DEFAULT_OUTPUT="$USER_PICTURES/dias"
+fi
+read -p "  Path [$DEFAULT_OUTPUT]: " OUTPUT_DIR
+OUTPUT_DIR="${OUTPUT_DIR:-$DEFAULT_OUTPUT}"
 OUTPUT_DIR=$(realpath -m "$OUTPUT_DIR")
 print_success "Output: $OUTPUT_DIR"
 
