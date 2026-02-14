@@ -113,12 +113,16 @@ class ImageProcessor:
         # Use PIL to load image and apply EXIF orientation
         try:
             with PILImage.open(image_path) as pil_img:
-                # Check if EXIF orientation exists
+                # Check if EXIF orientation exists and is meaningful
                 exif = pil_img.getexif()
-                has_orientation = exif and exif.get(274) is not None
+                orientation_tag = exif.get(274) if exif else None
 
-                # If no EXIF orientation tag, try auto-detection
-                if not has_orientation:
+                # Orientation tag 1 = Normal, but image might still be rotated
+                # Only trust orientation tags 2-8 (which indicate actual rotation/flip)
+                has_meaningful_orientation = orientation_tag is not None and orientation_tag != 1
+
+                # If no meaningful EXIF orientation tag, try auto-detection
+                if not has_meaningful_orientation:
                     try:
                         from core.orientation_detector import OrientationDetector
                         detected_angle = OrientationDetector.auto_detect_orientation(image_path)
@@ -132,9 +136,9 @@ class ImageProcessor:
                             elif detected_angle == 270:
                                 pil_img = pil_img.rotate(-270, expand=True)
                     except Exception as e:
-                        logger.debug(f"Auto-orientation detection failed: {e}")
+                        logger.warning(f"Auto-orientation detection failed: {e}")
 
-                # Apply EXIF orientation if present
+                # Apply EXIF orientation if present (for tags 2-8)
                 pil_img = ImageOps.exif_transpose(pil_img)
 
                 # Convert to RGB if needed
