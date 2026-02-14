@@ -6,6 +6,7 @@ import { Progress } from '@/components/ui/progress'
 import { useDuplicates } from '@/hooks/useDuplicates'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { Scan, CheckCircle, Image as ImageIcon } from 'lucide-react'
+import { API_URL, getAssetUrl } from '@/lib/api/client'
 
 interface ScanProgress {
   is_scanning: boolean
@@ -42,7 +43,7 @@ export function DuplicatesPage() {
 
     const pollProgress = async () => {
       try {
-        const response = await fetch('http://localhost:8000/api/duplicates/progress')
+        const response = await fetch('${API_URL}/api/duplicates/progress')
         const progress: ScanProgress = await response.json()
         setScanProgress(progress)
       } catch (error) {
@@ -254,8 +255,8 @@ export function DuplicatesPage() {
                               <img
                                 src={
                                   originalImage.thumbnail_url
-                                    ? `http://localhost:8000${originalImage.thumbnail_url}`
-                                    : `http://localhost:8000/${originalImage.enhanced_path}`
+                                    ? `${API_URL}${originalImage.thumbnail_url}`
+                                    : `${API_URL}/${originalImage.enhanced_path}`
                                 }
                                 alt={originalImage.filename}
                                 className="w-full h-full object-cover"
@@ -276,8 +277,8 @@ export function DuplicatesPage() {
                                 <img
                                   src={
                                     image.thumbnail_url
-                                      ? `http://localhost:8000${image.thumbnail_url}`
-                                      : `http://localhost:8000/${image.enhanced_path}`
+                                      ? `${API_URL}${image.thumbnail_url}`
+                                      : `${API_URL}/${image.enhanced_path}`
                                   }
                                   alt={image.filename}
                                   className="w-full h-full object-cover"
@@ -330,7 +331,7 @@ export function DuplicatesPage() {
           // Delete all duplicate images (keep the first one)
           for (const image of confirmDialog.duplicateImages) {
             try {
-              await fetch(`http://localhost:8000/api/images/${image.id}`, {
+              await fetch(`${API_URL}/api/images/${image.id}`, {
                 method: 'DELETE'
               })
             } catch (error) {

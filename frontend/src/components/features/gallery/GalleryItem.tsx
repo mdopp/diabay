@@ -2,6 +2,7 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import type { Image } from '@/types/image'
 import { Check } from 'lucide-react'
+import { getAssetUrl } from '@/lib/api/client'
 
 interface GalleryItemProps {
   image: Image
@@ -17,8 +18,8 @@ interface GalleryItemProps {
 export function GalleryItem({ image, isSelected, onSelect, onClick }: GalleryItemProps) {
   // Use thumbnail if available, otherwise fall back to full image
   const thumbnailUrl = image.thumbnail_url
-    ? `http://localhost:8000${image.thumbnail_url}`
-    : `http://localhost:8000/${image.enhanced_path}`
+    ? getAssetUrl(image.thumbnail_url)
+    : getAssetUrl(image.enhanced_path)
 
   return (
     <Card
