@@ -57,9 +57,58 @@ function Test-Command {
 Write-Header "DiaBay Installer for Windows"
 Write-Host "Professional Slide & Film Digitization System`n" -ForegroundColor White
 
-# Get script directory
+# Detect if running from web (irm|iex) or local file
 $SCRIPT_DIR = $PSScriptRoot
+$isRemoteExecution = [string]::IsNullOrEmpty($SCRIPT_DIR)
+
+if ($isRemoteExecution) {
+    Write-Info "Running from web - will download DiaBay first"
+
+    # Create temp directory for installation
+    $installPath = Join-Path $env:USERPROFILE "diabay"
+
+    if (Test-Path $installPath) {
+        Write-Host "`nDiaBay directory already exists at: $installPath" -ForegroundColor Yellow
+        $overwrite = Read-Host "Delete and re-download? (y/N)"
+        if ($overwrite -eq "y" -or $overwrite -eq "Y") {
+            Remove-Item $installPath -Recurse -Force
+            Write-Success "Removed existing directory"
+        } else {
+            Write-Info "Using existing directory"
+        }
+    }
+
+    if (-not (Test-Path $installPath)) {
+        Write-Host "Downloading DiaBay..." -ForegroundColor Cyan
+
+        # Check for git
+        if (Test-Command "git") {
+            Write-Host "Using git to clone repository..." -ForegroundColor Cyan
+            git clone https://github.com/mdopp/diabay.git $installPath 2>&1 | Out-Null
+            Write-Success "Repository cloned"
+        } else {
+            Write-Host "Downloading as ZIP (git not found)..." -ForegroundColor Cyan
+            $zipPath = Join-Path $env:TEMP "diabay.zip"
+            Invoke-WebRequest -Uri "https://github.com/mdopp/diabay/archive/refs/heads/main.zip" -OutFile $zipPath
+            Expand-Archive -Path $zipPath -DestinationPath $env:TEMP -Force
+            Move-Item (Join-Path $env:TEMP "diabay-main") $installPath
+            Remove-Item $zipPath
+            Write-Success "Repository downloaded"
+        }
+    }
+
+    $SCRIPT_DIR = $installPath
+    Write-Info "Installation directory: $installPath"
+}
+
 $BACKEND_DIR = Join-Path $SCRIPT_DIR "backend"
+
+# Verify backend directory exists
+if (-not (Test-Path $BACKEND_DIR)) {
+    Write-Error "Backend directory not found at: $BACKEND_DIR"
+    Write-Host "Please ensure you're running this script from the DiaBay directory." -ForegroundColor Yellow
+    exit 1
+}
 
 # ============================================================================
 # DEPENDENCY CHECKS
