@@ -515,8 +515,9 @@ class ProcessingPipeline:
 
         if existing_image:
             # Update existing record
+            # Store enhanced_path as relative to static file serving (e.g., "output/image.jpg")
             existing_image.original_path = str(analysed_path)
-            existing_image.enhanced_path = str(enhanced_path)
+            existing_image.enhanced_path = f"output/{enhanced_path.name}"
             existing_image.width = result.original_size[0]
             existing_image.height = result.original_size[1]
             existing_image.file_size = enhanced_path.stat().st_size
@@ -531,10 +532,11 @@ class ProcessingPipeline:
             image = existing_image
         else:
             # Create new image record
+            # Store enhanced_path as relative to static file serving (e.g., "output/image.jpg")
             image = Image(
                 filename=enhanced_path.name,
                 original_path=str(analysed_path),
-                enhanced_path=str(enhanced_path),
+                enhanced_path=f"output/{enhanced_path.name}",
                 width=result.original_size[0],
                 height=result.original_size[1],
                 file_size=enhanced_path.stat().st_size,

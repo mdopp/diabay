@@ -1560,11 +1560,14 @@ async def rescan_output_directory(
                     original_path_found = str(image_path)
                     logger.warning(f"Original TIFF not found for {image_path.name}, using enhanced path as placeholder")
 
-                # Create database record
+                # Create database record with relative path for frontend
+                # Store enhanced_path as relative to static file serving (e.g., "output/image.jpg")
+                relative_enhanced_path = f"output/{image_path.name}"
+
                 new_image = Image(
                     filename=image_path.name,
                     original_path=original_path_found,
-                    enhanced_path=str(image_path),
+                    enhanced_path=relative_enhanced_path,
                     width=width,
                     height=height,
                     status="completed",
