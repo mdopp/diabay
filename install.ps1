@@ -1,4 +1,3 @@
-#!/usr/bin/env pwsh
 <#
 .SYNOPSIS
     DiaBay - Professional Slide & Film Digitization System Installer
@@ -7,7 +6,7 @@
     configures directories, builds frontend, and sets up the application.
 .NOTES
     Author: korgraph.io
-    Requires: Python 3.10+, Node.js 18+ (for building)
+    Requires: Python 3.10+, Node.js 18+ (optional, for building)
 #>
 
 [CmdletBinding()]
@@ -69,22 +68,108 @@ $BACKEND_DIR = Join-Path $SCRIPT_DIR "backend"
 Write-Header "Checking Dependencies"
 
 # Check Python
-if (Test-Command "python") {
+$pythonInstalled = Test-Command "python"
+if ($pythonInstalled) {
     $pythonVersion = (python --version 2>&1) -replace "Python ", ""
-    Write-Success "Python $pythonVersion found"
-} else {
-    Write-Error "Python 3.10+ not found"
-    Write-Host "Please install Python from https://www.python.org/downloads/" -ForegroundColor Yellow
-    exit 1
+    $versionParts = $pythonVersion.Split('.')
+    $majorVersion = [int]$versionParts[0]
+    $minorVersion = [int]$versionParts[1]
+
+    if ($majorVersion -ge 3 -and $minorVersion -ge 10) {
+        Write-Success "Python $pythonVersion found"
+    } else {
+        Write-Error "Python $pythonVersion is too old (need 3.10+)"
+        $pythonInstalled = $false
+    }
 }
 
-# Check Node.js (optional, only for building)
+if (-not $pythonInstalled) {
+    Write-Host "`nPython 3.10+ is required but not found." -ForegroundColor Yellow
+    Write-Host "Installation options:" -ForegroundColor Yellow
+    Write-Host "  1. Install via winget (recommended)" -ForegroundColor White
+    Write-Host "  2. Install via Chocolatey" -ForegroundColor White
+    Write-Host "  3. Download from python.org" -ForegroundColor White
+    Write-Host "  4. Exit and install manually" -ForegroundColor White
+
+    $choice = Read-Host "`nChoose an option (1-4)"
+
+    switch ($choice) {
+        "1" {
+            if (Test-Command "winget") {
+                Write-Host "Installing Python via winget..." -ForegroundColor Cyan
+                winget install Python.Python.3.12 --silent
+                Write-Success "Python installed. Please restart your terminal and run the installer again."
+                exit 0
+            } else {
+                Write-Error "winget not found. Choose another option."
+                exit 1
+            }
+        }
+        "2" {
+            if (Test-Command "choco") {
+                Write-Host "Installing Python via Chocolatey..." -ForegroundColor Cyan
+                choco install python --version=3.12 -y
+                Write-Success "Python installed. Please restart your terminal and run the installer again."
+                exit 0
+            } else {
+                Write-Error "Chocolatey not found. Install from https://chocolatey.org/"
+                exit 1
+            }
+        }
+        "3" {
+            Write-Host "Opening Python download page..." -ForegroundColor Cyan
+            Start-Process "https://www.python.org/downloads/"
+            Write-Host "After installing Python, restart your terminal and run this installer again." -ForegroundColor Yellow
+            exit 0
+        }
+        default {
+            Write-Host "Please install Python 3.10+ manually from https://www.python.org/downloads/" -ForegroundColor Yellow
+            exit 1
+        }
+    }
+}
+
+# Check Node.js (optional, only for building from source)
 $hasNode = Test-Command "node"
 if ($hasNode) {
     $nodeVersion = (node --version 2>&1) -replace "v", ""
     Write-Success "Node.js $nodeVersion found"
 } else {
     Write-Info "Node.js not found - will use pre-built frontend from CI/CD"
+    Write-Host "`nNote: Node.js is optional. It's only needed to build the frontend from source." -ForegroundColor Gray
+    Write-Host "The installer will use pre-built frontend artifacts instead." -ForegroundColor Gray
+
+    $installNode = Read-Host "`nWould you like to install Node.js anyway? (y/N)"
+    if ($installNode -eq "y" -or $installNode -eq "Y") {
+        Write-Host "`nNode.js installation options:" -ForegroundColor Yellow
+        Write-Host "  1. Install via winget (recommended)" -ForegroundColor White
+        Write-Host "  2. Install via Chocolatey" -ForegroundColor White
+        Write-Host "  3. Skip Node.js installation" -ForegroundColor White
+
+        $nodeChoice = Read-Host "`nChoose an option (1-3)"
+
+        switch ($nodeChoice) {
+            "1" {
+                if (Test-Command "winget") {
+                    Write-Host "Installing Node.js via winget..." -ForegroundColor Cyan
+                    winget install OpenJS.NodeJS.LTS --silent
+                    $hasNode = $true
+                    Write-Success "Node.js installed"
+                }
+            }
+            "2" {
+                if (Test-Command "choco") {
+                    Write-Host "Installing Node.js via Chocolatey..." -ForegroundColor Cyan
+                    choco install nodejs-lts -y
+                    $hasNode = $true
+                    Write-Success "Node.js installed"
+                }
+            }
+            default {
+                Write-Info "Skipping Node.js - will use pre-built frontend"
+            }
+        }
+    }
 }
 
 # ============================================================================
