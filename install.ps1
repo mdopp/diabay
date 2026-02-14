@@ -64,17 +64,23 @@ $isRemoteExecution = [string]::IsNullOrEmpty($SCRIPT_DIR)
 if ($isRemoteExecution) {
     Write-Info "Running from web - will download DiaBay first"
 
-    # Create temp directory for installation
+    # Installation directory
     $installPath = Join-Path $env:USERPROFILE "diabay"
 
     if (Test-Path $installPath) {
-        Write-Host "`nDiaBay directory already exists at: $installPath" -ForegroundColor Yellow
-        $overwrite = Read-Host "Delete and re-download? (y/N)"
-        if ($overwrite -eq "y" -or $overwrite -eq "Y") {
-            Remove-Item $installPath -Recurse -Force
-            Write-Success "Removed existing directory"
+        Write-Info "DiaBay directory exists at: $installPath"
+        Write-Host "Updating existing installation..." -ForegroundColor Cyan
+
+        # Check if it's a git repo
+        if (Test-Path (Join-Path $installPath ".git")) {
+            Write-Host "Pulling latest changes from git..." -ForegroundColor Cyan
+            Push-Location $installPath
+            git pull 2>&1 | Out-Null
+            Pop-Location
+            Write-Success "Repository updated"
         } else {
-            Write-Info "Using existing directory"
+            Write-Info "Not a git repository - will re-download"
+            Remove-Item $installPath -Recurse -Force
         }
     }
 
@@ -178,48 +184,8 @@ if (-not $pythonInstalled) {
     }
 }
 
-# Check Node.js (optional, only for building from source)
-$hasNode = Test-Command "node"
-if ($hasNode) {
-    $nodeVersion = (node --version 2>&1) -replace "v", ""
-    Write-Success "Node.js $nodeVersion found"
-} else {
-    Write-Info "Node.js not found - will use pre-built frontend from CI/CD"
-    Write-Host "`nNote: Node.js is optional. It's only needed to build the frontend from source." -ForegroundColor Gray
-    Write-Host "The installer will use pre-built frontend artifacts instead." -ForegroundColor Gray
-
-    $installNode = Read-Host "`nWould you like to install Node.js anyway? (y/N)"
-    if ($installNode -eq "y" -or $installNode -eq "Y") {
-        Write-Host "`nNode.js installation options:" -ForegroundColor Yellow
-        Write-Host "  1. Install via winget (recommended)" -ForegroundColor White
-        Write-Host "  2. Install via Chocolatey" -ForegroundColor White
-        Write-Host "  3. Skip Node.js installation" -ForegroundColor White
-
-        $nodeChoice = Read-Host "`nChoose an option (1-3)"
-
-        switch ($nodeChoice) {
-            "1" {
-                if (Test-Command "winget") {
-                    Write-Host "Installing Node.js via winget..." -ForegroundColor Cyan
-                    winget install OpenJS.NodeJS.LTS --silent
-                    $hasNode = $true
-                    Write-Success "Node.js installed"
-                }
-            }
-            "2" {
-                if (Test-Command "choco") {
-                    Write-Host "Installing Node.js via Chocolatey..." -ForegroundColor Cyan
-                    choco install nodejs-lts -y
-                    $hasNode = $true
-                    Write-Success "Node.js installed"
-                }
-            }
-            default {
-                Write-Info "Skipping Node.js - will use pre-built frontend"
-            }
-        }
-    }
-}
+# Node.js not required - using pre-built frontend from CI/CD
+Write-Success "Using pre-built frontend (Node.js not required)"
 
 # ============================================================================
 # DIRECTORY CONFIGURATION
@@ -380,10 +346,11 @@ Write-Host "Installing PyTorch (CPU-only)..." -ForegroundColor Yellow
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu --quiet
 Write-Success "PyTorch installed"
 
-# Install remaining requirements
+# Install remaining requirements (skip packages already installed)
 Write-Host "Installing remaining dependencies..." -ForegroundColor Yellow
 $requirementsPath = Join-Path $BACKEND_DIR "requirements.txt"
-pip install -r $requirementsPath --quiet --prefer-binary
+# Use --no-deps to skip recompiling already-installed binary packages
+pip install -r $requirementsPath --quiet --no-deps
 Write-Success "All dependencies installed"
 
 # ============================================================================
@@ -395,38 +362,12 @@ Write-Header "Frontend Setup"
 $frontendDir = Join-Path $SCRIPT_DIR "frontend"
 $distDir = Join-Path $frontendDir "dist"
 
-if ($hasNode) {
-    Write-Host "Building frontend from source..." -ForegroundColor Yellow
-    Push-Location $frontendDir
-
-    # Install dependencies
-    Write-Host "Installing Node.js dependencies..." -ForegroundColor Yellow
-    & npm install --silent 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "Failed to install Node.js dependencies"
-        Write-Info "You can manually install later by running: cd frontend && npm install"
-    } else {
-        Write-Success "Dependencies installed"
-    }
-
-    # Build frontend
-    Write-Host "Building production bundle..." -ForegroundColor Yellow
-    & npm run build 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "Failed to build frontend"
-        Write-Info "Frontend build failed, but you can continue with pre-built version"
-    } else {
-        Write-Success "Frontend built successfully"
-    }
-
-    Pop-Location
-} elseif (Test-Path $distDir) {
-    Write-Success "Using pre-built frontend from CI/CD"
+# Always use pre-built frontend from CI/CD (included in repository)
+if (Test-Path $distDir) {
+    Write-Success "Using pre-built frontend (included in repository)"
 } else {
-    Write-Error "No frontend build found and Node.js not available"
-    Write-Host "Options:" -ForegroundColor Yellow
-    Write-Host "  1. Install Node.js and re-run this script" -ForegroundColor Yellow
-    Write-Host "  2. Download pre-built frontend from CI/CD artifacts" -ForegroundColor Yellow
+    Write-Error "Pre-built frontend not found at: $distDir"
+    Write-Host "Please ensure you downloaded the complete package from GitHub releases." -ForegroundColor Yellow
 }
 
 # ============================================================================
