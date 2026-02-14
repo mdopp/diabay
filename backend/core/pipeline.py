@@ -78,7 +78,14 @@ class ProcessingPipeline:
         self.stats['start_time'] = datetime.utcnow()
 
         # Create watchers for all input directories
-        for input_dir in settings.get_input_directories():
+        all_input_dirs = settings.get_input_directories()
+        logger.info(f"Setting up watchers for {len(all_input_dirs)} input directories")
+
+        for input_dir in all_input_dirs:
+            if not input_dir.exists():
+                logger.warning(f"Input directory does not exist: {input_dir}")
+                continue
+
             watcher = FileWatcher(
                 watch_dir=input_dir,
                 callback=self.process_file,
@@ -129,8 +136,9 @@ class ProcessingPipeline:
         """
         try:
             # First, process existing files in all input directories
-            logger.info("Background task: Processing existing files in input directories...")
-            for watcher in self.watchers:
+            logger.info(f"Background task: Processing existing files from {len(self.watchers)} watchers...")
+            for i, watcher in enumerate(self.watchers):
+                logger.info(f"  Watcher {i+1}/{len(self.watchers)}: {watcher.watch_dir}")
                 await watcher.process_existing_files()
 
             # Then, process existing files in analysed directory
