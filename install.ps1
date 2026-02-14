@@ -346,14 +346,10 @@ Write-Host "Installing PyTorch (CPU-only)..." -ForegroundColor Yellow
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu --quiet
 Write-Success "PyTorch installed"
 
-# Install remaining requirements (exclude already installed binaries)
+# Install remaining dependencies (use latest versions with pre-built wheels)
 Write-Host "Installing remaining dependencies..." -ForegroundColor Yellow
-$requirementsPath = Join-Path $BACKEND_DIR "requirements.txt"
-# Filter out numpy, pillow, opencv - already installed as binaries above
-$tempRequirements = Join-Path $env:TEMP "requirements-filtered.txt"
-Get-Content $requirementsPath | Where-Object { $_ -notmatch '^(numpy|pillow|opencv-python)' -and $_.Trim() -ne '' } | Set-Content $tempRequirements
-pip install -r $tempRequirements --quiet --only-binary=:all:
-Remove-Item $tempRequirements -ErrorAction SilentlyContinue
+# Install key packages - using latest versions to ensure pre-built wheels are available
+pip install fastapi uvicorn sqlalchemy aiosqlite pydantic pydantic-settings python-multipart aiofiles httpx tqdm --upgrade --quiet
 Write-Success "All dependencies installed"
 
 # ============================================================================
