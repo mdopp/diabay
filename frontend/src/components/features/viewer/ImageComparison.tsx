@@ -34,17 +34,19 @@ export function ImageComparison({ originalUrl, enhancedUrl, filename, showEnhanc
 
   // Expose toggle function to parent via ref or callback
   React.useEffect(() => {
-    ;(window as any).__toggleImageFullscreen = toggleFullscreen
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).__toggleImageFullscreen = toggleFullscreen
     return () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       delete (window as any).__toggleImageFullscreen
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFullscreen])
 
   // Image panel with zoom controls
   const ImagePanel = ({
     url,
     label,
-    isEnhanced: _isEnhanced,
     showMobileToggle
   }: {
     url: string
