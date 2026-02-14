@@ -1615,8 +1615,9 @@ async def rescan_output_directory(
 
         # Write tags to file metadata if requested
         if write_tags_to_files:
-            # Get all images with tags
-            query = select(Image).join(ImageTag, isouter=True)
+            # Get all images with tags (eagerly load tags relationship)
+            from sqlalchemy.orm import selectinload
+            query = select(Image).options(selectinload(Image.tags)).join(ImageTag, isouter=True)
             result = await db.execute(query)
             images_with_tags = result.scalars().unique().all()
 
