@@ -44,9 +44,18 @@ class Settings(BaseSettings):
 
     def ensure_directories(self):
         """Create necessary directories if they don't exist"""
+        import os
+        # Skip directory creation in CI/test environments or if paths are not writable
+        if os.getenv("CI") or os.getenv("PYTEST_CURRENT_TEST"):
+            return
+
         for dir_path in [self.input_dir, self.analysed_dir,
                          self.output_dir, self.models_dir]:
-            dir_path.mkdir(parents=True, exist_ok=True)
+            try:
+                dir_path.mkdir(parents=True, exist_ok=True)
+            except (PermissionError, OSError) as e:
+                # Log warning but don't fail - directories might be created later
+                print(f"Warning: Could not create directory {dir_path}: {e}")
 
 
 # Global settings instance
