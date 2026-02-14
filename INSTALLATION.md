@@ -27,7 +27,7 @@ Complete installation instructions for DiaBay - Professional Slide & Film Digiti
 
 **Option 2: One-line from web (if repository is public)**
 ```powershell
-irm https://raw.githubusercontent.com/YOUR_ORG/diabay/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/mdopp/diabay/main/install.ps1 | iex
 ```
 
 ### Linux/WSL
@@ -39,7 +39,7 @@ irm https://raw.githubusercontent.com/YOUR_ORG/diabay/main/install.ps1 | iex
 
 **Option 2: One-line from web (if repository is public)**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/YOUR_ORG/diabay/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/mdopp/diabay/main/install.sh | bash
 ```
 
 ---
@@ -105,7 +105,7 @@ If you prefer manual control:
 #### 1. Clone or Download
 
 ```bash
-git clone https://github.com/YOUR_ORG/diabay.git
+git clone https://github.com/mdopp/diabay.git
 cd diabay
 ```
 
@@ -436,7 +436,7 @@ For Windows-specific setup, see [WINDOWS_SETUP.md](WINDOWS_SETUP.md).
 
 ## Support
 
-- **Issues:** https://github.com/YOUR_ORG/diabay/issues
+- **Issues:** https://github.com/mdopp/diabay/issues
 - **Documentation:** Project README and docs/
 - **Website:** https://korgraph.io
 

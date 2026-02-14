@@ -55,13 +55,13 @@ Modern FastAPI + React application for processing, viewing, and organizing scann
 ./install.sh
 ```
 
-**From web (if repository is public):**
+**From web:**
 ```powershell
 # Windows PowerShell
-irm https://raw.githubusercontent.com/YOUR_ORG/diabay/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/mdopp/diabay/main/install.ps1 | iex
 
 # Linux/WSL
-curl -fsSL https://raw.githubusercontent.com/YOUR_ORG/diabay/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/mdopp/diabay/main/install.sh | bash
 ```
 
 **What the installer does:**
