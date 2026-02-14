@@ -27,6 +27,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg}'],
+        // Don't cache the main app JavaScript - always get fresh version
+        navigateFallbackDenylist: [/^\/api/, /^\/ws/],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -43,10 +45,11 @@ export default defineConfig({
             }
           },
           {
-            urlPattern: /^http:\/\/localhost:8000\/thumbnails\/.*/i,
+            // Match thumbnails from any host (localhost or network IP)
+            urlPattern: ({url}) => url.pathname.startsWith('/thumbnails/'),
             handler: 'CacheFirst',
             options: {
-              cacheName: 'thumbnail-cache',
+              cacheName: 'thumbnail-cache-v2',
               expiration: {
                 maxEntries: 200,
                 maxAgeSeconds: 60 * 60 * 24 * 7 // 1 week
@@ -57,10 +60,11 @@ export default defineConfig({
             }
           },
           {
-            urlPattern: /^http:\/\/localhost:8000\/previews\/.*/i,
+            // Match previews from any host
+            urlPattern: ({url}) => url.pathname.startsWith('/previews/'),
             handler: 'CacheFirst',
             options: {
-              cacheName: 'preview-cache',
+              cacheName: 'preview-cache-v2',
               expiration: {
                 maxEntries: 100,
                 maxAgeSeconds: 60 * 60 * 24 * 7 // 1 week
@@ -71,10 +75,11 @@ export default defineConfig({
             }
           },
           {
-            urlPattern: /^http:\/\/localhost:8000\/output\/.*/i,
+            // Match output images from any host
+            urlPattern: ({url}) => url.pathname.startsWith('/output/'),
             handler: 'CacheFirst',
             options: {
-              cacheName: 'enhanced-image-cache',
+              cacheName: 'enhanced-image-cache-v2',
               expiration: {
                 maxEntries: 100,
                 maxAgeSeconds: 60 * 60 * 24 * 7 // 1 week
@@ -85,10 +90,11 @@ export default defineConfig({
             }
           },
           {
-            urlPattern: /^http:\/\/localhost:8000\/api\/.*/i,
+            // Match API from any host - use NetworkFirst to always get fresh data
+            urlPattern: ({url}) => url.pathname.startsWith('/api/'),
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'api-cache',
+              cacheName: 'api-cache-v2',
               expiration: {
                 maxEntries: 50,
                 maxAgeSeconds: 60 * 5 // 5 minutes

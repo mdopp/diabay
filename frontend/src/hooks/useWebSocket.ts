@@ -25,8 +25,6 @@ export function useWebSocket() {
     const WS_URL = import.meta.env.VITE_WS_URL ||
       `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:8000/ws/status`
 
-    console.log('[useWebSocket] Creating WebSocket manager with URL:', WS_URL)
-
     // Get store functions
     const handleWebSocketMessage = useStatsStore.getState().handleWebSocketMessage
     const setConnectionStatus = useStatsStore.getState().setConnectionStatus
@@ -35,7 +33,6 @@ export function useWebSocket() {
     wsRef.current = new WebSocketManager({
       url: WS_URL,
       onMessage: (message) => {
-        console.log('[useWebSocket] Received message:', message)
         try {
           handleWebSocketMessage(message)
         } catch (error) {
@@ -43,7 +40,6 @@ export function useWebSocket() {
         }
       },
       onStatusChange: (status) => {
-        console.log('[useWebSocket] Status changed to:', status)
         setConnectionStatus(status)
       },
       reconnectDelay: 2000,
@@ -56,7 +52,6 @@ export function useWebSocket() {
 
     // Cleanup on unmount
     return () => {
-      console.log('[useWebSocket] Cleaning up WebSocket connection')
       if (wsRef.current) {
         wsRef.current.disconnect()
         wsRef.current = null

@@ -39,7 +39,7 @@ export class WebSocketManager {
    */
   connect(): void {
     if (this.ws?.readyState === WebSocket.OPEN) {
-      console.log('[WebSocket] Already connected')
+      // [WebSocket] Already connected')
       return
     }
 
@@ -47,11 +47,11 @@ export class WebSocketManager {
     this.config.onStatusChange('connecting')
 
     try {
-      console.log('[WebSocket] Connecting to:', this.config.url)
+      // [WebSocket] Connecting to:', this.config.url)
       this.ws = new WebSocket(this.config.url)
 
       this.ws.onopen = () => {
-        console.log('[WebSocket] Connected')
+        // [WebSocket] Connected')
         this.reconnectAttempts = 0
         this.reconnectDelay = this.config.reconnectDelay || 2000
         this.config.onStatusChange('connected')
@@ -59,21 +59,19 @@ export class WebSocketManager {
       }
 
       this.ws.onmessage = (event: MessageEvent) => {
-        console.log('[WebSocket] Received message:', event.data)
+        // [WebSocket] Received message:', event.data)
         try {
           const message: WebSocketMessage = JSON.parse(event.data)
-          console.log('[WebSocket] Parsed message successfully:', message)
+          // [WebSocket] Parsed message successfully:', message)
           this.config.onMessage(message)
-          console.log('[WebSocket] onMessage callback completed')
+          // [WebSocket] onMessage callback completed')
         } catch (error) {
           console.error('[WebSocket] Failed to parse message:', error)
           console.error('[WebSocket] Raw message data:', event.data)
         }
       }
 
-      this.ws.onclose = (event: CloseEvent) => {
-        console.log('[WebSocket] Disconnected - Code:', event.code, 'Reason:', event.reason, 'Was Clean:', event.wasClean)
-        console.log('[WebSocket] Intentionally closed:', this.isIntentionallyClosed)
+      this.ws.onclose = () => {
         this.stopHeartbeat()
         this.config.onStatusChange('disconnected')
 
@@ -175,7 +173,7 @@ export class WebSocketManager {
    * Manually trigger reconnection (for UI retry button)
    */
   reconnect(): void {
-    console.log('[WebSocket] Manual reconnect triggered')
+    // [WebSocket] Manual reconnect triggered')
     this.reconnectAttempts = 0 // Reset attempt counter
     this.disconnect()
     this.connect()
