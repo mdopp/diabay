@@ -8,6 +8,9 @@ class Settings(BaseSettings):
 
     # Directories
     input_dir: Path = Path("./input")
+    # Comma-separated list of additional input directories to watch
+    # Example: INPUT_DIRS="D:/Scans/New,D:/Scans/Archive"
+    input_dirs: str = ""
     analysed_dir: Path = Path("./analysed")
     output_dir: Path = Path("./output")
     models_dir: Path = Path("./models")
@@ -42,6 +45,24 @@ class Settings(BaseSettings):
         case_sensitive=False
     )
 
+    def get_input_directories(self) -> list[Path]:
+        """
+        Get all input directories (main + additional)
+
+        Returns:
+            List of Path objects for all input directories
+        """
+        dirs = [self.input_dir]
+
+        # Parse comma-separated additional directories
+        if self.input_dirs:
+            for dir_str in self.input_dirs.split(','):
+                dir_str = dir_str.strip()
+                if dir_str:
+                    dirs.append(Path(dir_str))
+
+        return dirs
+
     def ensure_directories(self):
         """Create necessary directories if they don't exist"""
         import os
@@ -49,8 +70,10 @@ class Settings(BaseSettings):
         if os.getenv("CI") or os.getenv("PYTEST_CURRENT_TEST"):
             return
 
-        for dir_path in [self.input_dir, self.analysed_dir,
-                         self.output_dir, self.models_dir]:
+        # Get all input directories
+        all_input_dirs = self.get_input_directories()
+
+        for dir_path in all_input_dirs + [self.analysed_dir, self.output_dir, self.models_dir]:
             try:
                 dir_path.mkdir(parents=True, exist_ok=True)
             except (PermissionError, OSError) as e:

@@ -308,7 +308,7 @@ async def api_root():
         "name": "DiaBay",
         "version": "3.0.0",
         "status": "running",
-        "pipeline_active": pipeline is not None and pipeline.watcher is not None
+        "pipeline_active": pipeline is not None and len(pipeline.watchers) > 0
     }
 
 

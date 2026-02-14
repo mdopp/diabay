@@ -55,7 +55,7 @@ class ProcessingPipeline:
             logger.warning(f"AI tagger initialization failed: {e}")
             logger.warning("Auto-tagging will be disabled")
 
-        self.watcher: Optional[FileWatcher] = None
+        self.watchers: list[FileWatcher] = []  # Multiple input directory watchers
         self.output_watcher: Optional[FileWatcher] = None  # Watches output directory for deletions
 
         # Processing state
@@ -77,12 +77,15 @@ class ProcessingPipeline:
 
         self.stats['start_time'] = datetime.utcnow()
 
-        # Create input directory watcher (for new files)
-        self.watcher = FileWatcher(
-            watch_dir=settings.input_dir,
-            callback=self.process_file,
-            debounce_seconds=2.0
-        )
+        # Create watchers for all input directories
+        for input_dir in settings.get_input_directories():
+            watcher = FileWatcher(
+                watch_dir=input_dir,
+                callback=self.process_file,
+                debounce_seconds=2.0
+            )
+            self.watchers.append(watcher)
+            logger.info(f"Created watcher for input directory: {input_dir}")
 
         # Create output directory watcher (for deletions)
         self.output_watcher = FileWatcher(
@@ -92,8 +95,9 @@ class ProcessingPipeline:
             debounce_seconds=0.5
         )
 
-        # Start watching
-        await self.watcher.start()
+        # Start all watchers
+        for watcher in self.watchers:
+            await watcher.start()
         await self.output_watcher.start()
 
         # Launch background task to process existing files (don't block API startup)
@@ -103,8 +107,8 @@ class ProcessingPipeline:
 
     async def stop(self):
         """Stop the pipeline"""
-        if self.watcher:
-            await self.watcher.stop()
+        for watcher in self.watchers:
+            await watcher.stop()
 
         if self.output_watcher:
             await self.output_watcher.stop()
@@ -124,9 +128,10 @@ class ProcessingPipeline:
         2. Existing files in analysed directory (enhance only)
         """
         try:
-            # First, process existing files in input directory
-            logger.info("Background task: Processing existing files in input directory...")
-            await self.watcher.process_existing_files()
+            # First, process existing files in all input directories
+            logger.info("Background task: Processing existing files in input directories...")
+            for watcher in self.watchers:
+                await watcher.process_existing_files()
 
             # Then, process existing files in analysed directory
             logger.info("Background task: Processing existing files in analysed directory...")
