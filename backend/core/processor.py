@@ -4,11 +4,14 @@ Handles all image processing: enhancement, format conversion, quality optimizati
 """
 import cv2
 import numpy as np
+import logging
 from pathlib import Path
 from typing import Tuple, Optional, Dict
 from dataclasses import dataclass
 from enum import Enum
 from PIL import Image as PILImage, ImageOps
+
+logger = logging.getLogger(__name__)
 
 
 class EnhancementPreset(Enum):
@@ -110,6 +113,27 @@ class ImageProcessor:
         # Use PIL to load image and apply EXIF orientation
         try:
             with PILImage.open(image_path) as pil_img:
+                # Check if EXIF orientation exists
+                exif = pil_img.getexif()
+                has_orientation = exif and exif.get(274) is not None
+
+                # If no EXIF orientation tag, try auto-detection
+                if not has_orientation:
+                    try:
+                        from core.orientation_detector import OrientationDetector
+                        detected_angle = OrientationDetector.auto_detect_orientation(image_path)
+                        if detected_angle != 0:
+                            logger.info(f"Auto-detected orientation: {detected_angle}° for {image_path.name}")
+                            # Rotate the image based on detection
+                            if detected_angle == 90:
+                                pil_img = pil_img.rotate(-90, expand=True)
+                            elif detected_angle == 180:
+                                pil_img = pil_img.rotate(180, expand=True)
+                            elif detected_angle == 270:
+                                pil_img = pil_img.rotate(-270, expand=True)
+                    except Exception as e:
+                        logger.debug(f"Auto-orientation detection failed: {e}")
+
                 # Apply EXIF orientation if present
                 pil_img = ImageOps.exif_transpose(pil_img)
 
