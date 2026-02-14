@@ -550,7 +550,7 @@ async def list_images(
             {
                 "id": img.id,
                 "filename": img.filename,
-                "enhanced_path": img.enhanced_path,
+                "enhanced_path": f"/output/{img.filename}",  # Serve via static files mount
                 "thumbnail_url": f"/thumbnails/{img.filename}",  # Thumbnails served as static files
                 "width": img.width,
                 "height": img.height,
