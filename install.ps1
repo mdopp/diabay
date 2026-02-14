@@ -346,11 +346,14 @@ Write-Host "Installing PyTorch (CPU-only)..." -ForegroundColor Yellow
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu --quiet
 Write-Success "PyTorch installed"
 
-# Install remaining requirements (skip packages already installed)
+# Install remaining requirements (exclude already installed binaries)
 Write-Host "Installing remaining dependencies..." -ForegroundColor Yellow
 $requirementsPath = Join-Path $BACKEND_DIR "requirements.txt"
-# Use --no-deps to skip recompiling already-installed binary packages
-pip install -r $requirementsPath --quiet --no-deps
+# Filter out numpy, pillow, opencv - already installed as binaries above
+$tempRequirements = Join-Path $env:TEMP "requirements-filtered.txt"
+Get-Content $requirementsPath | Where-Object { $_ -notmatch '^(numpy|pillow|opencv-python)' -and $_.Trim() -ne '' } | Set-Content $tempRequirements
+pip install -r $tempRequirements --quiet --only-binary=:all:
+Remove-Item $tempRequirements -ErrorAction SilentlyContinue
 Write-Success "All dependencies installed"
 
 # ============================================================================
@@ -362,12 +365,32 @@ Write-Header "Frontend Setup"
 $frontendDir = Join-Path $SCRIPT_DIR "frontend"
 $distDir = Join-Path $frontendDir "dist"
 
-# Always use pre-built frontend from CI/CD (included in repository)
+# Check if pre-built frontend exists
 if (Test-Path $distDir) {
-    Write-Success "Using pre-built frontend (included in repository)"
+    Write-Success "Using pre-built frontend"
 } else {
-    Write-Error "Pre-built frontend not found at: $distDir"
-    Write-Host "Please ensure you downloaded the complete package from GitHub releases." -ForegroundColor Yellow
+    Write-Info "Pre-built frontend not found - downloading from GitHub releases..."
+
+    try {
+        # Download latest release artifact
+        $artifactUrl = "https://github.com/mdopp/diabay/releases/latest/download/frontend-dist.zip"
+        $zipPath = Join-Path $env:TEMP "diabay-frontend.zip"
+
+        Write-Host "Downloading frontend..." -ForegroundColor Yellow
+        Invoke-WebRequest -Uri $artifactUrl -OutFile $zipPath -UseBasicParsing
+
+        Write-Host "Extracting frontend..." -ForegroundColor Yellow
+        Expand-Archive -Path $zipPath -DestinationPath $frontendDir -Force
+        Remove-Item $zipPath -ErrorAction SilentlyContinue
+
+        Write-Success "Frontend downloaded and extracted"
+    } catch {
+        Write-Error "Failed to download frontend from GitHub releases"
+        Write-Host "You can:" -ForegroundColor Yellow
+        Write-Host "  1. Download the complete package from https://github.com/mdopp/diabay/releases" -ForegroundColor Yellow
+        Write-Host "  2. Wait for CI/CD to build and publish artifacts" -ForegroundColor Yellow
+        Write-Host "`nContinuing without frontend - backend will still work." -ForegroundColor Gray
+    }
 }
 
 # ============================================================================
