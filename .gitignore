@@ -36,6 +36,13 @@ backend/tests/samples/*.tif
 backend/tests/samples/*.jpg
 !backend/tests/samples/.gitkeep
 
+# Test images and temporary test scripts
+backend/*.tif
+backend/*.tiff
+backend/test_*.py
+backend/check_*.py
+!backend/tests/test_*.py
+
 # Keep dist folder (pre-built frontend for Windows)
 # !frontend/dist/
 
