@@ -43,7 +43,7 @@ export function DuplicatesPage() {
 
     const pollProgress = async () => {
       try {
-        const response = await fetch('${API_URL}/api/duplicates/progress')
+        const response = await fetch(`${API_URL}/api/duplicates/progress')
         const progress: ScanProgress = await response.json()
         setScanProgress(progress)
       } catch (error) {
