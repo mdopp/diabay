@@ -268,20 +268,42 @@ class ImageProcessor:
 
         TODO: Replace with MTCNN for better accuracy
         """
-        if self._face_cascade is None:
-            self._face_cascade = cv2.CascadeClassifier(
-                cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+        try:
+            # Validate image
+            if img is None or img.size == 0:
+                return []
+
+            # Check image dimensions - skip if too large (memory issues)
+            height, width = img.shape[:2]
+            if height > 8000 or width > 8000:
+                logger.warning(f"Image too large for face detection: {width}x{height}")
+                return []
+
+            if self._face_cascade is None:
+                self._face_cascade = cv2.CascadeClassifier(
+                    cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+                )
+
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+            # Ensure gray image is valid
+            if gray is None or gray.size == 0:
+                return []
+
+            faces = self._face_cascade.detectMultiScale(
+                gray,
+                scaleFactor=1.1,
+                minNeighbors=5,
+                minSize=(30, 30)
             )
 
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        faces = self._face_cascade.detectMultiScale(
-            gray,
-            scaleFactor=1.1,
-            minNeighbors=5,
-            minSize=(30, 30)
-        )
-
-        return faces
+            return faces
+        except cv2.error as e:
+            logger.warning(f"OpenCV face detection error: {e}")
+            return []
+        except Exception as e:
+            logger.warning(f"Face detection failed: {e}")
+            return []
 
     def _apply_face_aware_enhancement(self,
                                      img: np.ndarray,
