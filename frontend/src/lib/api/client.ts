@@ -7,7 +7,7 @@ import axios, { AxiosError } from 'axios'
 // Use relative URL (same host) or environment variable
 // This allows accessing from any device on the network
 export const API_URL = import.meta.env.VITE_API_URL ||
-  (typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8000` : 'http://localhost:8000')
+  `${window.location.protocol}//${window.location.hostname}:8000`
 
 // Helper function to get full URL for static files
 export const getAssetUrl = (path: string): string => {

@@ -25,6 +25,15 @@ export function useWebSocket() {
     const WS_URL = import.meta.env.VITE_WS_URL ||
       `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:8000/ws/status`
 
+    // DEBUG: Log the WebSocket URL being used
+    console.log('='.repeat(80))
+    console.log('WEBSOCKET CONNECTION INFO:')
+    console.log('  window.location.hostname:', window.location.hostname)
+    console.log('  window.location.protocol:', window.location.protocol)
+    console.log('  VITE_WS_URL env var:', import.meta.env.VITE_WS_URL || '(not set)')
+    console.log('  Final WS_URL:', WS_URL)
+    console.log('='.repeat(80))
+
     // Get store functions
     const handleWebSocketMessage = useStatsStore.getState().handleWebSocketMessage
     const setConnectionStatus = useStatsStore.getState().setConnectionStatus
