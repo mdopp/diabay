@@ -340,15 +340,20 @@ Write-Host "Activating virtual environment..." -ForegroundColor Yellow
 Write-Host "Upgrading pip..." -ForegroundColor Yellow
 python -m pip install --upgrade pip --quiet
 
+# Install binary packages first (to avoid compilation issues)
+Write-Host "Installing binary dependencies..." -ForegroundColor Yellow
+pip install --only-binary=:all: numpy pillow opencv-python-headless --quiet
+Write-Success "Binary packages installed"
+
 # Install PyTorch (CPU-only for better compatibility)
 Write-Host "Installing PyTorch (CPU-only)..." -ForegroundColor Yellow
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu --quiet
 Write-Success "PyTorch installed"
 
-# Install requirements
-Write-Host "Installing dependencies..." -ForegroundColor Yellow
+# Install remaining requirements
+Write-Host "Installing remaining dependencies..." -ForegroundColor Yellow
 $requirementsPath = Join-Path $BACKEND_DIR "requirements.txt"
-pip install -r $requirementsPath --quiet
+pip install -r $requirementsPath --quiet --prefer-binary
 Write-Success "All dependencies installed"
 
 # ============================================================================
@@ -366,13 +371,23 @@ if ($hasNode) {
 
     # Install dependencies
     Write-Host "Installing Node.js dependencies..." -ForegroundColor Yellow
-    npm install --silent 2>&1 | Out-Null
-    Write-Success "Dependencies installed"
+    & npm install --silent 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Failed to install Node.js dependencies"
+        Write-Info "You can manually install later by running: cd frontend && npm install"
+    } else {
+        Write-Success "Dependencies installed"
+    }
 
     # Build frontend
     Write-Host "Building production bundle..." -ForegroundColor Yellow
-    npm run build 2>&1 | Out-Null
-    Write-Success "Frontend built successfully"
+    & npm run build 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Failed to build frontend"
+        Write-Info "Frontend build failed, but you can continue with pre-built version"
+    } else {
+        Write-Success "Frontend built successfully"
+    }
 
     Pop-Location
 } elseif (Test-Path $distDir) {
