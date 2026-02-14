@@ -8,7 +8,12 @@ import { useStatsStore } from '@/store/useStatsStore'
  * Retries indefinitely with exponential backoff (capped at 30s)
  */
 
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws/status'
+// Use dynamic WebSocket URL based on current hostname
+// This allows accessing from any device on the network
+const WS_URL = import.meta.env.VITE_WS_URL ||
+  (typeof window !== 'undefined'
+    ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:8000/ws/status`
+    : 'ws://localhost:8000/ws/status')
 
 export function useWebSocket() {
   const wsRef = useRef<WebSocketManager | null>(null)

@@ -4,7 +4,10 @@ import axios, { AxiosError } from 'axios'
  * Axios client for API requests
  */
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+// Use relative URL (same host) or environment variable
+// This allows accessing from any device on the network
+const API_URL = import.meta.env.VITE_API_URL ||
+  (typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8000` : 'http://localhost:8000')
 
 export const apiClient = axios.create({
   baseURL: API_URL,
