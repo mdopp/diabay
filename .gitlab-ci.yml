@@ -1,0 +1,182 @@
+###############################################################################
+# DiaBay - GitLab CI/CD Pipeline
+#
+# Builds frontend and creates deployment artifacts
+# Pre-built artifacts can be used for installations without Node.js
+###############################################################################
+
+stages:
+  - test
+  - build
+  - package
+
+variables:
+  NODE_VERSION: "20"
+  PYTHON_VERSION: "3.11"
+
+# ============================================================================
+# FRONTEND BUILD
+# ============================================================================
+
+frontend:test:
+  stage: test
+  image: node:${NODE_VERSION}-alpine
+  cache:
+    key:
+      files:
+        - frontend/package-lock.json
+    paths:
+      - frontend/node_modules/
+  before_script:
+    - cd frontend
+    - npm ci --silent
+  script:
+    - npm run lint
+    - npm run type-check
+  only:
+    changes:
+      - frontend/**/*
+      - .gitlab-ci.yml
+
+frontend:build:
+  stage: build
+  image: node:${NODE_VERSION}-alpine
+  cache:
+    key:
+      files:
+        - frontend/package-lock.json
+    paths:
+      - frontend/node_modules/
+  before_script:
+    - cd frontend
+    - npm ci --silent
+  script:
+    - npm run build
+    - echo "Build completed at $(date)"
+    - du -sh dist/
+  artifacts:
+    name: "diabay-frontend-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - frontend/dist/
+    expire_in: 30 days
+  only:
+    - main
+    - tags
+    - merge_requests
+
+# ============================================================================
+# BACKEND TESTS
+# ============================================================================
+
+backend:test:
+  stage: test
+  image: python:${PYTHON_VERSION}-slim
+  cache:
+    key:
+      files:
+        - backend/requirements.txt
+        - backend/requirements-test.txt
+    paths:
+      - backend/.venv/
+  before_script:
+    - cd backend
+    - python -m venv .venv
+    - source .venv/bin/activate
+    - pip install --quiet --upgrade pip
+    - pip install --quiet torch torchvision --index-url https://download.pytorch.org/whl/cpu
+    - pip install --quiet -r requirements.txt -r requirements-test.txt
+  script:
+    - pytest tests/ --verbose
+  only:
+    changes:
+      - backend/**/*.py
+      - backend/requirements*.txt
+      - .gitlab-ci.yml
+
+# ============================================================================
+# PACKAGE ARTIFACTS
+# ============================================================================
+
+package:windows:
+  stage: package
+  image: alpine:latest
+  dependencies:
+    - frontend:build
+  script:
+    - apk add --no-cache zip
+    - mkdir -p package/diabay
+    # Copy application files
+    - cp -r frontend/dist package/diabay/frontend/
+    - cp -r backend package/diabay/
+    # Copy documentation
+    - cp README.md WINDOWS_SETUP.md DEPLOYMENT.md package/diabay/
+    # Copy installers
+    - cp install.ps1 install.bat package/diabay/
+    # Create zip
+    - cd package
+    - zip -r ../diabay-windows-${CI_COMMIT_SHORT_SHA}.zip diabay/
+    - cd ..
+    - ls -lh diabay-windows-*.zip
+  artifacts:
+    name: "diabay-windows-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - diabay-windows-*.zip
+    expire_in: 90 days
+  only:
+    - tags
+    - main
+
+package:linux:
+  stage: package
+  image: alpine:latest
+  dependencies:
+    - frontend:build
+  script:
+    - apk add --no-cache tar
+    - mkdir -p package/diabay
+    # Copy application files
+    - cp -r frontend/dist package/diabay/frontend/
+    - cp -r backend package/diabay/
+    # Copy documentation
+    - cp README.md DEPLOYMENT.md package/diabay/
+    # Copy installers
+    - cp install.sh package/diabay/
+    - chmod +x package/diabay/install.sh
+    # Create tarball
+    - cd package
+    - tar czf ../diabay-linux-${CI_COMMIT_SHORT_SHA}.tar.gz diabay/
+    - cd ..
+    - ls -lh diabay-linux-*.tar.gz
+  artifacts:
+    name: "diabay-linux-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - diabay-linux-*.tar.gz
+    expire_in: 90 days
+  only:
+    - tags
+    - main
+
+# ============================================================================
+# RELEASE (Tags only)
+# ============================================================================
+
+release:
+  stage: package
+  image: alpine:latest
+  dependencies:
+    - frontend:build
+    - package:windows
+    - package:linux
+  script:
+    - echo "Release ${CI_COMMIT_TAG}"
+    - echo "Frontend build included"
+    - echo "Windows and Linux packages created"
+  artifacts:
+    name: "diabay-${CI_COMMIT_TAG}"
+    paths:
+      - diabay-windows-*.zip
+      - diabay-linux-*.tar.gz
+      - frontend/dist/
+    expire_in: 1 year
+  only:
+    - tags

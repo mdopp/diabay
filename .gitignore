@@ -38,3 +38,14 @@ backend/tests/samples/*.jpg
 
 # Keep dist folder (pre-built frontend for Windows)
 # !frontend/dist/
+
+# Installation artifacts
+start-diabay.ps1
+start-diabay.bat
+start-diabay.sh
+*.tar.gz
+*.zip
+package/
+
+# User configuration (created by installer)
+backend/.env

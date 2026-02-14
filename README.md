@@ -43,7 +43,43 @@ Modern FastAPI + React application for processing, viewing, and organizing scann
 
 ## Quick Start
 
-### Linux/WSL (Development)
+### 🚀 One-Command Installation
+
+**Windows:** Download and run:
+```powershell
+.\install.bat
+```
+
+**Linux/WSL:** Download and run:
+```bash
+./install.sh
+```
+
+**From web (if repository is public):**
+```powershell
+# Windows PowerShell
+irm https://raw.githubusercontent.com/YOUR_ORG/diabay/main/install.ps1 | iex
+
+# Linux/WSL
+curl -fsSL https://raw.githubusercontent.com/YOUR_ORG/diabay/main/install.sh | bash
+```
+
+**What the installer does:**
+- ✅ Checks Python 3.10+ (required) and Node.js (optional)
+- ✅ Asks for input directory → default: `Documents`
+- ✅ Asks for output directory → default: `Pictures/dias`
+- ✅ Creates all required directories automatically
+- ✅ Generates `.env` configuration file with proper paths
+- ✅ Creates Python virtual environment
+- ✅ Installs PyTorch (CPU-only) and all dependencies
+- ✅ Builds frontend or uses pre-built from CI/CD
+- ✅ Creates startup scripts (`start-diabay.bat` / `start-diabay.sh`)
+
+📖 For detailed installation options, see **[INSTALLATION.md](INSTALLATION.md)**
+
+### Manual Installation
+
+#### Linux/WSL (Development)
 
 ```bash
 cd backend
@@ -62,7 +98,7 @@ python main.py
 
 **Open browser:** http://localhost:8000
 
-### Windows (Production)
+#### Windows (Production)
 
 See **[WINDOWS_SETUP.md](WINDOWS_SETUP.md)** for detailed Windows installation guide.
 
@@ -82,6 +118,26 @@ python main.py
 - The server binds to `0.0.0.0`, making it accessible on all network interfaces
 - Find your server's IP: `ip addr show` (Linux) or `ipconfig` (Windows)
 - Access from phone/tablet: `http://192.168.x.x:8000` (replace with actual IP)
+
+### Starting DiaBay
+
+After installation, start the application:
+
+**Windows:**
+```powershell
+.\start-diabay.bat
+```
+
+**Linux:**
+```bash
+./start-diabay.sh
+```
+
+**Linux (with systemd service):**
+```bash
+systemctl --user start diabay
+systemctl --user status diabay
+```
 
 ## Usage
 
@@ -132,6 +188,22 @@ Automatic file monitoring is enabled by default:
 - Resume processing after restart (database-tracked)
 - No configuration needed
 
+## Pre-Built Packages
+
+For users without Node.js, download pre-built packages from our CI/CD pipeline:
+
+**GitLab CI/CD Artifacts:**
+- Navigate to your GitLab project → CI/CD → Pipelines
+- Download latest successful pipeline artifact
+- Extract and run the installer
+
+**Release Downloads:**
+- Check the [Releases](../../releases) page for stable builds
+- Windows: `diabay-windows-{version}.zip`
+- Linux: `diabay-linux-{version}.tar.gz`
+
+These packages include pre-built frontend, so Node.js is not required.
+
 ## Requirements
 
 - Python 3.10+
@@ -140,7 +212,7 @@ Automatic file monitoring is enabled by default:
 - Pillow (EXIF reading, no exiftool needed!)
 - FastAPI + Uvicorn (web framework)
 - SQLAlchemy (database ORM)
-- Node.js (for frontend builds, optional for production)
+- Node.js 18+ (optional, only for building frontend from source)
 
 ## Architecture
 
@@ -165,7 +237,8 @@ See **[DEPLOYMENT.md](DEPLOYMENT.md)** for production deployment details.
 
 ## Documentation
 
-- **[WINDOWS_SETUP.md](WINDOWS_SETUP.md)** - Windows installation guide
+- **[INSTALLATION.md](INSTALLATION.md)** - Complete installation guide for all platforms
+- **[WINDOWS_SETUP.md](WINDOWS_SETUP.md)** - Windows-specific setup instructions
 - **[DEPLOYMENT.md](DEPLOYMENT.md)** - Production deployment guide
 - **[backend/README.md](backend/README.md)** - Backend architecture and API
 
