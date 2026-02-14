@@ -1542,10 +1542,28 @@ async def rescan_output_directory(
 
                 height, width = img.shape[:2]
 
+                # Try to find original TIFF file in input directory
+                # Convert JPG filename back to TIFF pattern (e.g., image_260204_093826.jpg -> image_260204_093826.tif)
+                input_dir = settings.input_dir
+                base_name = image_path.stem  # filename without extension
+                original_path_found = None
+
+                # Try different TIFF extensions
+                for ext in ['.tif', '.tiff', '.TIF', '.TIFF']:
+                    potential_original = input_dir / f"{base_name}{ext}"
+                    if potential_original.exists():
+                        original_path_found = str(potential_original)
+                        break
+
+                # If no original found, use enhanced path as placeholder
+                if not original_path_found:
+                    original_path_found = str(image_path)
+                    logger.warning(f"Original TIFF not found for {image_path.name}, using enhanced path as placeholder")
+
                 # Create database record
                 new_image = Image(
                     filename=image_path.name,
-                    original_path=None,  # Unknown for rescanned images
+                    original_path=original_path_found,
                     enhanced_path=str(image_path),
                     width=width,
                     height=height,
@@ -1584,10 +1602,16 @@ async def rescan_output_directory(
 
             except Exception as img_err:
                 logger.error(f"Error processing {image_path.name}: {img_err}")
+                await db.rollback()  # Rollback failed transaction
                 continue
 
         # Commit all new records
-        await db.commit()
+        try:
+            await db.commit()
+        except Exception as commit_err:
+            logger.error(f"Error committing changes: {commit_err}")
+            await db.rollback()
+            raise
 
         # Write tags to file metadata if requested
         if write_tags_to_files:
