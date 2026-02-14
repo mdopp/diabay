@@ -113,17 +113,7 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0', // Listen on all network interfaces
-    port: 5000,
-    proxy: {
-      '/api': {
-        target: 'http://localhost:8000',
-        changeOrigin: true
-      },
-      '/ws': {
-        target: 'ws://localhost:8000',
-        ws: true
-      }
-    }
+    port: 5000
   },
   build: {
     outDir: 'dist',
