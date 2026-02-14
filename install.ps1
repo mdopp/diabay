@@ -349,7 +349,7 @@ Write-Success "PyTorch installed"
 # Install remaining dependencies (use latest versions with pre-built wheels)
 Write-Host "Installing remaining dependencies..." -ForegroundColor Yellow
 # Install key packages - using latest versions to ensure pre-built wheels are available
-pip install fastapi uvicorn sqlalchemy aiosqlite pydantic pydantic-settings python-multipart aiofiles httpx tqdm --upgrade --quiet
+pip install fastapi uvicorn sqlalchemy aiosqlite pydantic pydantic-settings python-multipart aiofiles httpx tqdm watchdog --upgrade --quiet
 Write-Success "All dependencies installed"
 
 # ============================================================================
