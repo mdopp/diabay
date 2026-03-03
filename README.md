@@ -5,8 +5,8 @@
  / _` | |/ _` |  _ < / _` | | | |
 | (_| | | (_| | |_) | (_| | |_| |
  \__,_|_|\__,_|____/ \__,_|\__, |
-                             __/ |
-                            |___/
+                            __/ |
+         by Korgraph       |___/
 ```
 
 **Scanned slide & film digitization toolkit.**
@@ -14,68 +14,7 @@ Turn raw TIFF scans into organized, enhanced, correctly oriented JPEGs — from 
 
 ---
 
-## What It Does
-
-diaBay is a CLI pipeline that takes a folder of scanned slides or film negatives (TIFFs) and produces print-ready output. It handles the tedious parts of bulk scan processing automatically:
-
-1. **Rename** files from scanner gibberish (`IMG_00042.tif`) to EXIF timestamps (`20240815_143022.jpg`)
-2. **Enhance** contrast, color, and detail — face-aware, so portraits don't get blown out
-3. **Orient** images using EXIF data and face detection
-4. **Preview** every processed image live in the terminal as it works
-5. **Review** results in a browser-based gallery with one-click rotation correction
-6. **Export** high-resolution JPEGs and lossless JPEG XL from the originals
-
-## Features
-
-### Enhancement Pipeline
-
-- **16-bit to 8-bit conversion** with per-channel percentile stretching — no clipping, no haze
-- **Adaptive CLAHE** in LAB color space — boosts contrast without shifting colors
-- **Face-aware processing** — detects faces via Haar cascades and applies gentler enhancement to skin tones
-- **Auto preset selection** — tries gentle, balanced, and aggressive profiles, picks the one with the best quality score
-- **OpenVINO super-resolution** — optional AI upscaling via Intel's single-image-super-resolution model, with automatic device selection (NPU > GPU > CPU)
-
-### Orientation Detection
-
-- Reads **EXIF orientation tags** from scanner metadata
-- **Face-based rotation** — rotates the image 4 ways, picks the one where the most faces are detected (requires a clear winner to avoid false corrections)
-
-### Review Server
-
-A built-in Flask web app for inspecting results:
-
-- **Gallery view** with thumbnails on a dark-themed grid
-- **Per-card rotation buttons** — rotate left, flip, rotate right without opening each image
-- **Modal detail view** — click any thumbnail for a full-size preview with metadata
-- **Batch apply** — queue up rotation corrections and apply them all at once (parallel processing)
-- Runs automatically during processing and can be started standalone
-
-### Export
-
-Produces archival-quality output from the original TIFFs:
-
-- `highres/` — 8-bit JPEG, quality 98, 4:4:4 chroma subsampling
-- `highres_jxl/` — 16-bit JPEG XL, lossless (requires `imagecodecs`)
-- **Rotation recovery** — compares enhanced JPEGs to originals to determine the correct rotation, even if the manifest was lost
-
-### Performance
-
-- **Resume support** — manifest tracks what's been processed; re-run safely without redoing work
-- **Smart I/O** — detects slow mounts (WSL `/mnt/`, NFS `/media/`) and processes locally first, then copies in the background
-- **Live terminal preview** — half-block Unicode rendering of each image as it's processed
-- **Rich progress** — per-image ETA, throughput stats, and a collapsible review server log panel
-
-## Installation
-
-### Prerequisites
-
-- Python 3.10+
-- OpenCV with Haar cascades (included in `opencv-python`)
-- Optional: [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) for OSD-based orientation
-- Optional: [OpenVINO](https://docs.openvino.ai/) for AI super-resolution
-- Optional: `imagecodecs` for JPEG XL export
-
-### Setup
+## Quick Start
 
 ```bash
 git clone https://github.com/mdopp/diabay.git
@@ -83,16 +22,26 @@ cd diabay
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+
+# Process a folder of scanned TIFFs
+python diabay.py /path/to/scans
 ```
 
-## Usage
+That's it. diaBay will enhance, rename, orient, and thumbnail every TIFF it finds. A review gallery opens automatically at `http://localhost:5555`.
 
-### Process scans
+## What It Does
+
+diaBay takes a folder of scanned slides or film negatives (TIFFs) and produces print-ready output:
+
+- **Rename** — scanner filenames (`IMG_00042.tif`) become EXIF timestamps (`20240815_143022.jpg`)
+- **Enhance** — adaptive contrast and color correction, face-aware so portraits don't get blown out
+- **Orient** — automatic rotation via EXIF data and face detection
+- **Review** — browser-based gallery with one-click rotation correction
+- **Export** — high-res JPEGs and lossless JPEG XL from the originals
+
+## Usage Examples
 
 ```bash
-# Process all TIFFs in a folder
-python diabay.py /path/to/scans
-
 # Include subdirectories (prefixes filenames with folder name)
 python diabay.py /path/to/scans -r
 
@@ -102,31 +51,38 @@ python diabay.py /path/to/scans -o /mnt/e/output
 # Use a specific enhancement preset
 python diabay.py /path/to/scans --preset aggressive
 
+# CLAHE only, no AI super-resolution
+python diabay.py /path/to/scans --no-ai
+
 # Skip specific steps
 python diabay.py /path/to/scans --skip-enhance --skip-orient
 
-# CLAHE only, no AI super-resolution
-python diabay.py /path/to/scans --no-ai
-```
-
-### Review results
-
-```bash
-# Open the review gallery in your browser
+# Open the review gallery standalone
 python diabay.py --review /path/to/output
-```
 
-The review server starts at `http://localhost:5555`. During processing, it runs automatically in the background so you can review images as they come in.
-
-### Export high-res
-
-```bash
-# Export from original TIFFs using the processed manifest
+# Export high-res from original TIFFs
 python diabay.py --export /path/to/output
-
-# Force re-export everything
-python diabay.py --export --force /path/to/output
 ```
+
+## How It Works
+
+**Enhancement** — 16-bit to 8-bit conversion with percentile stretching, adaptive CLAHE in LAB color space (preserves colors), face-aware processing with gentler correction on skin tones. Auto mode tries all presets and picks the best. Optional OpenVINO super-resolution on NPU/GPU/CPU.
+
+**Orientation** — Reads EXIF tags from scanner metadata. Face-based detection rotates the image 4 ways and picks the rotation where the most faces are found.
+
+**Review** — Built-in Flask gallery with thumbnail grid, per-card rotation buttons, full-size modal previews, and batch apply. Runs automatically during processing.
+
+**Export** — Archival output from original TIFFs: high-res JPEG (quality 98, 4:4:4 chroma) and lossless 16-bit JPEG XL. Recovers correct rotation by comparing enhanced JPEGs to originals.
+
+**Performance** — Resume support via manifest, smart I/O for slow mounts (WSL `/mnt/`, NFS), live terminal image preview, and per-image ETA.
+
+## Optional Dependencies
+
+The core pipeline only needs what's in `requirements.txt`. For extra capabilities:
+
+- [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) — OSD-based orientation detection
+- [OpenVINO](https://docs.openvino.ai/) — AI super-resolution (NPU > GPU > CPU, auto-selected)
+- `pip install imagecodecs` — JPEG XL lossless export
 
 ## CLI Reference
 
