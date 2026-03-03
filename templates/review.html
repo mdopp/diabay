@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DiaBay Review</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1a1a2e; color: #eee; }
+
+  header { position: sticky; top: 0; z-index: 50; padding: 0.8rem 2rem; background: #16213e; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+  header h1 { font-size: 1.4rem; }
+  .header-right { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+  .btn { padding: 0.5rem 1rem; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem; font-weight: 600; }
+  .btn-primary { background: #0f3460; color: #fff; }
+  .btn-primary:hover { background: #1a4a7a; }
+  .btn-primary:disabled { opacity: 0.5; cursor: default; }
+
+  .gallery { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 1.5rem; }
+  @media (max-width: 900px) { .gallery { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 500px) { .gallery { grid-template-columns: 1fr; } }
+
+  .card { background: #16213e; border-radius: 8px; overflow: hidden; position: relative; outline: 3px solid transparent; transition: outline 0.1s; }
+  .card.selected { outline: 3px solid #3b82f6; }
+  .card .thumb { position: relative; cursor: pointer; }
+  .card .thumb:hover { opacity: 0.9; }
+  .card img { width: 100%; display: block; aspect-ratio: 4/3; object-fit: cover; transition: transform 0.3s; }
+  .card .info { padding: 0.4rem 0.7rem; font-size: 0.75rem; display: flex; justify-content: space-between; color: #aaa; }
+  .card .badge { position: absolute; top: 6px; right: 6px; background: #e94560; color: #fff; font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 4px; display: none; }
+  .card.changed .badge { display: block; }
+
+  /* Per-card rotation buttons — always visible at bottom of image */
+  .card-rot { display: flex; justify-content: center; gap: 2px; padding: 4px; background: #0d1b2a; }
+  .card-rot button { flex: 1; padding: 6px 0; border: none; background: transparent; color: #8899aa; font-size: 15px; cursor: pointer; border-radius: 4px; transition: background 0.1s, color 0.1s; }
+  .card-rot button:hover { background: #1a3050; color: #fff; }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 100; justify-content: center; align-items: center; }
+  .modal-overlay.active { display: flex; }
+  .modal { background: #16213e; border-radius: 12px; max-width: 95vw; max-height: 95vh; overflow: auto; padding: 1.5rem; width: 900px; }
+  .modal h2 { margin-bottom: 1rem; font-size: 1.1rem; }
+  .modal img.preview { width: 100%; border-radius: 6px; margin-bottom: 1rem; }
+
+  .rotation-controls { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 1rem; }
+  .rotation-controls span { font-size: 0.85rem; color: #aaa; margin-right: 0.5rem; }
+  .rot-btn { padding: 0.4rem 0.8rem; border: 2px solid #333; background: transparent; color: #ccc; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
+  .rot-btn.active { border-color: #0f3460; background: #0f3460; color: #fff; }
+  .rot-btn:hover { border-color: #1a4a7a; }
+
+  .meta { font-size: 0.8rem; color: #888; }
+
+  .status { font-size: 0.85rem; color: #aaa; }
+  .status.success { color: #4ade80; }
+  .status.error { color: #f87171; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>DiaBay Review</h1>
+  <div class="header-right">
+    <span class="status" id="status"></span>
+    <button class="btn btn-primary" id="applyBtn" disabled onclick="applyAll()">Apply Corrections</button>
+  </div>
+</header>
+
+<div class="gallery" id="gallery"></div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal" id="modal">
+    <h2 id="modalTitle"></h2>
+    <img class="preview" id="enhImg" src="" alt="Enhanced">
+    <div class="rotation-controls">
+      <span>Rotate:</span>
+      <button class="rot-btn" data-angle="0" onclick="setRotation(0)">0°</button>
+      <button class="rot-btn" data-angle="90" onclick="setRotation(90)">&#8635; 90°</button>
+      <button class="rot-btn" data-angle="180" onclick="setRotation(180)">180°</button>
+      <button class="rot-btn" data-angle="270" onclick="setRotation(270)">&#8634; 270°</button>
+    </div>
+    <div class="meta" id="modalMeta"></div>
+  </div>
+</div>
+
+<script>
+const manifest = {{ manifest | tojson }};
+const images = manifest.images || {};
+const corrections = {};
+let currentStem = null;
+let cacheBust = '';
+const visualAngles = {};  // cumulative CSS rotation per stem (not clamped to 0-360)
+
+function getSortedStems() {
+  return Object.keys(images).sort();
+}
+
+function getTargetRotation(stem) {
+  return corrections[stem] !== undefined ? corrections[stem] : (images[stem].rotation || 0);
+}
+
+function setCorrection(stem, angle) {
+  angle = ((angle % 360) + 360) % 360;
+  const orig = images[stem].rotation || 0;
+  if (angle === orig) {
+    delete corrections[stem];
+  } else {
+    corrections[stem] = angle;
+  }
+}
+
+function rotateCard(stem, delta, e) {
+  e.stopPropagation();
+  setCorrection(stem, getTargetRotation(stem) + delta);
+  visualAngles[stem] = (visualAngles[stem] || 0) + delta;
+  updateCard(stem);
+  updateApplyBtn();
+}
+
+/* ── Full gallery rebuild (init + after apply) ── */
+function renderGallery() {
+  const gallery = document.getElementById('gallery');
+  gallery.innerHTML = '';
+  const stems = getSortedStems();
+
+  stems.forEach((stem, idx) => {
+    const info = images[stem];
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.id = 'card-' + stem;
+    card.dataset.stem = stem;
+    const src = `/images/thumbs/${stem}.jpg` + (cacheBust ? `?t=${cacheBust}` : '');
+    card.innerHTML = `
+      <div class="thumb">
+        <img src="${src}" alt="${stem}">
+        <div class="badge"></div>
+      </div>
+      <div class="card-rot">
+        <button title="Rotate left (90° CCW)">&#8634; Left</button>
+        <button title="Flip upside down (180°)">&#8693; Flip</button>
+        <button title="Rotate right (90° CW)">&#8635; Right</button>
+      </div>
+      <div class="info">
+        <span>${stem}</span>
+        <span class="rot-info"></span>
+      </div>
+    `;
+    card.querySelector('.thumb').addEventListener('click', () => openModal(stem));
+    const btns = card.querySelectorAll('.card-rot button');
+    btns[0].addEventListener('click', (e) => rotateCard(stem, -90, e));
+    btns[1].addEventListener('click', (e) => rotateCard(stem, 180, e));
+    btns[2].addEventListener('click', (e) => rotateCard(stem, 90, e));
+    gallery.appendChild(card);
+  });
+
+  updateAllCards();
+}
+
+/* ── Update a single card (no DOM rebuild) ── */
+function updateCard(stem) {
+  const card = document.getElementById('card-' + stem);
+  if (!card) return;
+  const info = images[stem];
+  const isChanged = corrections[stem] !== undefined;
+  const rot = getTargetRotation(stem);
+
+  card.classList.toggle('changed', isChanged);
+  card.querySelector('.badge').textContent = isChanged ? `${rot}\u00b0` : '';
+  card.querySelector('.rot-info').textContent = `${rot}\u00b0 | Q:${(info.quality_score || 0).toFixed(0)}`;
+
+  const va = visualAngles[stem] || 0;
+  const absDelta = ((va % 360) + 360) % 360;
+  const img = card.querySelector('img');
+  if (absDelta === 90 || absDelta === 270) {
+    img.style.transform = `rotate(${va}deg) scale(0.75)`;
+  } else if (absDelta === 180) {
+    img.style.transform = `rotate(${va}deg)`;
+  } else {
+    img.style.transform = va ? `rotate(${va}deg)` : '';
+  }
+}
+
+function updateAllCards() {
+  getSortedStems().forEach(updateCard);
+  updateApplyBtn();
+}
+
+function openModal(stem) {
+  currentStem = stem;
+  const info = images[stem];
+  document.getElementById('modalTitle').textContent = stem;
+  document.getElementById('enhImg').src = `/images/enhanced/${stem}.jpg?t=${Date.now()}`;
+  document.getElementById('modalMeta').textContent =
+    `Original: ${info.original} | Preset: ${info.preset} | Quality: ${(info.quality_score||0).toFixed(1)} | Faces: ${info.faces_detected||0}`;
+
+  const currentRot = getTargetRotation(stem);
+  document.querySelectorAll('.modal .rot-btn').forEach(btn => {
+    btn.classList.toggle('active', parseInt(btn.dataset.angle) === currentRot);
+  });
+
+  document.getElementById('modalOverlay').classList.add('active');
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById('modalOverlay')) {
+    document.getElementById('modalOverlay').classList.remove('active');
+    currentStem = null;
+  }
+}
+
+function setRotation(angle) {
+  if (!currentStem) return;
+  setCorrection(currentStem, angle);
+
+  document.querySelectorAll('.modal .rot-btn').forEach(btn => {
+    btn.classList.toggle('active', parseInt(btn.dataset.angle) === angle);
+  });
+
+  updateCard(currentStem);
+  updateApplyBtn();
+}
+
+function updateApplyBtn() {
+  const btn = document.getElementById('applyBtn');
+  const count = Object.keys(corrections).length;
+  btn.disabled = count === 0;
+  btn.textContent = count > 0 ? `Apply ${count} Correction${count > 1 ? 's' : ''}` : 'Apply Corrections';
+}
+
+async function applyAll() {
+  const entries = Object.entries(corrections);
+  if (entries.length === 0) return;
+  const btn = document.getElementById('applyBtn');
+  const status = document.getElementById('status');
+  btn.disabled = true;
+  status.textContent = '';
+  status.className = 'status';
+
+  let done = 0;
+  let errors = 0;
+  let next = 0;
+  const total = entries.length;
+
+  function updateProgress() {
+    btn.textContent = `Applying ${done}/${total}...`;
+  }
+
+  function applyOne() {
+    if (next >= total) return null;
+    const [stem, rot] = entries[next++];
+    return fetch('/api/apply', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({corrections: {[stem]: rot}})
+    }).then(r => r.json()).then(data => {
+      if (data.ok) {
+        images[stem].rotation = rot;
+        delete corrections[stem];
+      } else {
+        errors++;
+      }
+    }).catch(() => { errors++; }).then(() => {
+      done++;
+      updateProgress();
+      return applyOne();
+    });
+  }
+
+  updateProgress();
+  const concurrency = 3;
+  await Promise.all(Array.from({length: concurrency}, () => applyOne()));
+
+  if (errors === 0) {
+    status.textContent = `${total} correction${total > 1 ? 's' : ''} applied!`;
+    status.className = 'status success';
+  } else {
+    status.textContent = `Done with ${errors} error${errors > 1 ? 's' : ''}`;
+    status.className = 'status error';
+  }
+  cacheBust = Date.now();
+  for (const k in visualAngles) delete visualAngles[k];
+  renderGallery();
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (document.getElementById('modalOverlay').classList.contains('active')) {
+      document.getElementById('modalOverlay').classList.remove('active');
+      currentStem = null;
+    }
+  }
+});
+
+renderGallery();
+</script>
+</body>
+</html>
